@@ -45,7 +45,7 @@ public static class AssemblyGenerator
 
         if (type.IsGenericType)
         {
-            if (type.IsGenericTypeDefinition)
+            if (!type.IsGenericTypeDefinition)
             {
                 type = type.GetGenericTypeDefinition();
             }
@@ -78,7 +78,7 @@ public static class AssemblyGenerator
         /// <param name="key">key</param>
         /// <param name="defaultValue">默认值</param>
         /// <returns>值</returns>
-        public TValue GetOrDefault(TKey key, Func<TValue> defaultValue)
+        private TValue GetOrDefault(TKey key, Func<TValue> defaultValue)
         {
             if (dictionary.TryGetValue(key, out var value)) return value;
             value = defaultValue();

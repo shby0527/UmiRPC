@@ -2,7 +2,7 @@ using System.Reflection;
 
 namespace Umi.Proxy.Dynamic.Aspect.Invocations;
 
-internal abstract class InvocationBase(
+public abstract class InvocationBase(
     Type interfaceType,
     MethodInfo method,
     object[] arguments,

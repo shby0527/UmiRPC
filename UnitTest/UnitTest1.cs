@@ -1,4 +1,10 @@
-﻿namespace UnitTest;
+﻿using System.Diagnostics;
+using System.Reflection;
+using DynamicProxy;
+using Umi.Proxy.Dynamic.Aspect;
+using Umi.Proxy.Dynamic.Dynamic;
+
+namespace UnitTest;
 
 public class Tests
 {
@@ -10,21 +16,26 @@ public class Tests
     [Test]
     public void Test1()
     {
-        ITest? a = null;
-        ITest? b = null;
-        var d = a.TestInt;
+        var type = AssemblyGenerator.GetOrGenerateType(typeof(ITest<int>));
+        var instance = (ITest<int>)Activator.CreateInstance(type.MakeGenericType(typeof(int)), new TestInvorker(),
+            (IEnumerable<IInterceptor>)[]);
+        Debug.WriteLine(instance.Test(1));
+        Debug.WriteLine(instance.Property);
+        Assert.Pass(type.ToString());
     }
 }
 
-public interface ITest
+public class TestInvorker : IInvoker
 {
-    static abstract ITest operator +(ITest l, ITest b);
+    public void Process(IMethodInvocation input)
+    {
+        input.ReturnValue = 1;
+    }
+}
 
-    static abstract event EventHandler TestEvent;
+public interface ITest<T>
+{
+    int Test(T input);
 
-    static abstract int TestMethod();
-
-    static abstract int Test { get; }
-    
-    int TestInt { get; }
+    int Property { get; }
 }

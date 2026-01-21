@@ -2,7 +2,7 @@ using System.Reflection;
 
 namespace Umi.Proxy.Dynamic.Aspect.Invocations;
 
-internal sealed class StaticMethodInvocation(
+public sealed class StaticMethodInvocation(
     Type interfaceType,
     MethodInfo method,
     object[] arguments,

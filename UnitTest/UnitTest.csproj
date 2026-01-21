@@ -20,4 +20,8 @@
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\DynamicProxy\DynamicProxy.csproj" />
+  </ItemGroup>
+
 </Project>
