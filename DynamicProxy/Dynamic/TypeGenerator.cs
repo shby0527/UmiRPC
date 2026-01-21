@@ -293,6 +293,7 @@ internal class TypeGenerator
         il.DeclareLocal(typeof(Type[]));
         il.DeclareLocal(typeof(Type[]));
         il.DeclareLocal(typeof(IMethodInvocation));
+        il.DeclareLocal(typeof(Type[]));
         var parameters = origin.GetParameters();
 
         #region generate arguments array
@@ -359,6 +360,32 @@ internal class TypeGenerator
 
         #endregion
 
+        #region generic type arguments
+
+        if (!_interfaceType.IsGenericType)
+        {
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Newarr, typeof(Type));
+        }
+        else
+        {
+            var genericArguments = _interfaceType.GetGenericArguments();
+            il.Emit(OpCodes.Ldc_I4_S, genericArguments.Length);
+            il.Emit(OpCodes.Newarr, typeof(Type));
+            for (var i = 0; i < genericArguments.Length; i++)
+            {
+                il.Emit(OpCodes.Dup);
+                il.Emit(OpCodes.Ldc_I4_S, i);
+                il.Emit(OpCodes.Ldtoken, genericArguments[i]);
+                il.Emit(OpCodes.Call, _typeGetTypeFromHandle);
+                il.Emit(OpCodes.Stelem_Ref);
+            }
+        }
+
+        il.Emit(OpCodes.Stloc_S, 4);
+
+        #endregion
+
         #region instance IMethodInvocation
 
         // 判断是否静态方法
@@ -379,6 +406,7 @@ internal class TypeGenerator
             il.Emit(OpCodes.Ldarg_0);
         }
 
+        il.Emit(OpCodes.Ldloc_S, 4);
         // 其他通用的
         il.Emit(OpCodes.Ldtoken, _interfaceType);
         il.Emit(OpCodes.Call, _typeGetTypeFromHandle);

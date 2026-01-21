@@ -3,6 +3,7 @@ using System.Reflection;
 namespace Umi.Proxy.Dynamic.Aspect.Invocations;
 
 public abstract class InvocationBase(
+    Type[] typeGenericArguments,
     Type interfaceType,
     MethodInfo method,
     object[] arguments,
@@ -11,6 +12,8 @@ public abstract class InvocationBase(
     Type returnType)
     : IMethodInvocation
 {
+    public Type GetTypeGenericArgument(int index) => typeGenericArguments[index];
+
     private readonly Type[] _argumentTypes = argumentTypes ?? throw new ArgumentNullException(nameof(argumentTypes));
 
     private readonly Type[] _genericArguments =

@@ -8,6 +8,13 @@ namespace Umi.Proxy.Dynamic.Aspect;
 public interface IMethodInvocation
 {
     /// <summary>
+    /// 获取类的实际泛型参数
+    /// </summary>
+    /// <param name="index">索引</param>
+    /// <returns></returns>
+    public Type GetTypeGenericArgument(int index);
+
+    /// <summary>
     /// 被代理类型
     /// </summary>
     public Type TargetType { get; }
