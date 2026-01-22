@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace UmiRpcProtocolStruct.Protocol;
+namespace Umi.Rpc.Protocol;
 
 public abstract unsafe class RpcPackageBase : IDisposable
 {
@@ -26,20 +26,6 @@ public abstract unsafe class RpcPackageBase : IDisposable
         NativeMemory.Fill(Data, (UIntPtr)_size, 0);
     }
 
-    private void Dispose(bool disposing)
-    {
-        if (_disposed) return;
-        if (disposing)
-        {
-            // 释放托管资源
-            // 这里没有，就不管了
-        }
-
-        NativeMemory.Free(Data);
-
-        _disposed = true;
-    }
-
     public ReadOnlySpan<byte> Memory
     {
         get
@@ -54,6 +40,21 @@ public abstract unsafe class RpcPackageBase : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
     }
 
+    #region IDisposable Support
+
+    private void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+        if (disposing)
+        {
+            // 释放托管资源
+            // 这里没有，就不管了
+        }
+
+        NativeMemory.Free(Data);
+
+        _disposed = true;
+    }
 
     public void Dispose()
     {
@@ -65,4 +66,6 @@ public abstract unsafe class RpcPackageBase : IDisposable
     {
         Dispose(false);
     }
+
+    #endregion
 }

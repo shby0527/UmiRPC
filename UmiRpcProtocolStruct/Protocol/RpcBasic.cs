@@ -1,25 +1,27 @@
 using System.Buffers;
 using System.Runtime.InteropServices;
 
-namespace UmiRpcProtocolStruct.Protocol;
+namespace Umi.Rpc.Protocol;
 
-public sealed unsafe class RpcBasicPackage : RpcPackageBase
+public sealed unsafe class RpcBasic : RpcPackageBase
 {
+    // ReSharper disable once MemberCanBePrivate.Global
+    // ReSharper disable once InconsistentNaming
     public const int SIZE_OF_PACKAGE = 33;
 
-    // 4 bytes   uint Magic
-    // 1 byte    byte Version
-    // 4 bytes   uint Command
-    // 20 bytes  byte[] Session
-    // 4 bytes   int Length
+    // 4 bytes    Magic: uint
+    // 1 byte     Version: byte
+    // 4 bytes    Command: uint
+    // 20 bytes   Session: byte[]
+    // 4 bytes    Length: int  这是 Payload 数据长度
     // total = 33 bytes
 
-    private RpcBasicPackage(void* data)
+    private RpcBasic(void* data)
         : base(data, SIZE_OF_PACKAGE)
     {
     }
 
-    public RpcBasicPackage()
+    public RpcBasic()
         : base(SIZE_OF_PACKAGE)
     {
     }
@@ -89,21 +91,21 @@ public sealed unsafe class RpcBasicPackage : RpcPackageBase
         }
     }
 
-    public static RpcBasicPackage CreateFromMemory(scoped in ReadOnlySequence<byte> data)
+    public static RpcBasic CreateFromMemory(scoped in ReadOnlySequence<byte> data)
     {
         if (data.Length < SIZE_OF_PACKAGE) throw new ArgumentOutOfRangeException(nameof(data));
         var buffer = NativeMemory.Alloc(SIZE_OF_PACKAGE);
         Span<byte> span = new(buffer, SIZE_OF_PACKAGE);
         data.CopyTo(span);
-        return new RpcBasicPackage(buffer);
+        return new RpcBasic(buffer);
     }
 
-    public static RpcBasicPackage CreateFromMemory(scoped in ReadOnlySpan<byte> data)
+    public static RpcBasic CreateFromMemory(scoped in ReadOnlySpan<byte> data)
     {
         if (data.Length < SIZE_OF_PACKAGE) throw new IndexOutOfRangeException(nameof(data));
         var buffer = NativeMemory.Alloc(SIZE_OF_PACKAGE);
         Span<byte> span = new(buffer, SIZE_OF_PACKAGE);
         data.CopyTo(span);
-        return new RpcBasicPackage(buffer);
+        return new RpcBasic(buffer);
     }
 }

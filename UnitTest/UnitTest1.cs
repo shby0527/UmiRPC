@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using DynamicProxy;
 using Umi.Proxy.Dynamic.Aspect;
 using Umi.Proxy.Dynamic.Dynamic;
-using UmiRpcProtocolStruct.Protocol;
+using Umi.Rpc.Protocol;
 
 namespace UnitTest;
 
@@ -34,7 +34,7 @@ public class Tests
     [Test]
     public void TestBasicPackage()
     {
-        using RpcBasicPackage package = new();
+        using RpcBasic package = new();
         using var rnd = RandomNumberGenerator.Create();
         package.Magic = 0x123;
         package.Version = 0x1;
@@ -53,7 +53,7 @@ public class Tests
     [Test]
     public void TestCommonErrorPackage()
     {
-        using var p = RpcCommonErrorPackage.CreateFromMessage(unchecked((int)0x80_12_34_56), "123456789阿加法术的入口处");
+        using var p = RpcCommonError.CreateFromMessage(unchecked((int)0x80_12_34_56), "123456789阿加法术的入口处");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(p.IsSuccess, Is.False);
@@ -63,7 +63,7 @@ public class Tests
             Assert.That(p.Message, Is.EqualTo("123456789阿加法术的入口处"));
         }
 
-        using var p2 = RpcCommonErrorPackage.CreateFromMemory(p.Memory);
+        using var p2 = RpcCommonError.CreateFromMemory(p.Memory);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(p2.IsSuccess, Is.False);
@@ -71,6 +71,33 @@ public class Tests
             Assert.That(p2.Code, Is.EqualTo(0x12_34_56));
             Assert.That(p2.MessageLength, Is.EqualTo(33));
             Assert.That(p2.Message, Is.EqualTo("123456789阿加法术的入口处"));
+        }
+    }
+
+    [Test]
+    public void TestAuthenticationMessage()
+    {
+        using var rng = RandomNumberGenerator.Create();
+        Span<byte> buffer = stackalloc byte[40];
+        rng.GetBytes(buffer);
+        using var msg = RpcAuthenticationMessage.CreateFromMessage(0x3, "admin", "a password text", buffer);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(msg.LoginType, Is.EqualTo(0x3));
+            Assert.That(msg.UserName, Is.EqualTo("admin"));
+            Assert.That(msg.Password, Is.EqualTo("a password text"));
+            Assert.That(msg.KeySignedData.SequenceEqual(buffer),
+                $"{nameof(msg.KeySignedData)} is not equal {nameof(buffer)}");
+        }
+
+        using var msg2 = RpcAuthenticationMessage.CreateFromMemory(msg.Memory);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(msg2.LoginType, Is.EqualTo(0x3));
+            Assert.That(msg2.UserName, Is.EqualTo("admin"));
+            Assert.That(msg2.Password, Is.EqualTo("a password text"));
+            Assert.That(msg2.KeySignedData.SequenceEqual(buffer),
+                $"{nameof(msg2.KeySignedData)} is not equal {nameof(buffer)}");
         }
     }
 }

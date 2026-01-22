@@ -2,15 +2,15 @@ using System.Buffers;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace UmiRpcProtocolStruct.Protocol;
+namespace Umi.Rpc.Protocol;
 
-public sealed unsafe class RpcCommonErrorPackage : RpcPackageBase
+public sealed unsafe class RpcCommonError : RpcPackageBase
 {
     // 内存布局
     // 4 bytes ErrorCode:int
     // 4 bytes MessageLength:int
     // MessageLength bytes  Message:string
-    private RpcCommonErrorPackage(void* data, int size)
+    private RpcCommonError(void* data, int size)
         : base(data, size)
     {
     }
@@ -39,20 +39,20 @@ public sealed unsafe class RpcCommonErrorPackage : RpcPackageBase
 
     public string Message => Encoding.UTF8.GetString(new ReadOnlySpan<byte>((byte*)Data + 8, MessageLength));
 
-    public static RpcCommonErrorPackage CreateFromMemory(scoped in ReadOnlySpan<byte> data)
+    public static RpcCommonError CreateFromMemory(scoped in ReadOnlySpan<byte> data)
     {
         if (data.Length < 8) throw new ArgumentOutOfRangeException(nameof(data));
         fixed (byte* pd = data)
         {
             var l = *(int*)(pd + 4);
-            if (data.Length < l + 8) throw new ArgumentOutOfRangeException(nameof(data));
+            if (l <= 0 || data.Length < l + 8) throw new ArgumentOutOfRangeException(nameof(data));
             var buffer = NativeMemory.Alloc((UIntPtr)(l + 8));
             data.CopyTo(new Span<byte>(buffer, l + 8));
-            return new RpcCommonErrorPackage(buffer, l + 8);
+            return new RpcCommonError(buffer, l + 8);
         }
     }
 
-    public static RpcCommonErrorPackage CreateFromMemory(scoped in ReadOnlySequence<byte> data)
+    public static RpcCommonError CreateFromMemory(scoped in ReadOnlySequence<byte> data)
     {
         if (data.Length < 8) throw new ArgumentOutOfRangeException(nameof(data));
         Span<byte> tmp = stackalloc byte[4];
@@ -60,20 +60,20 @@ public sealed unsafe class RpcCommonErrorPackage : RpcPackageBase
         fixed (byte* pl = tmp)
         {
             var l = *(int*)pl;
-            if (data.Length < l + 8) throw new ArgumentOutOfRangeException(nameof(data));
+            if (l <= 0 || data.Length < l + 8) throw new ArgumentOutOfRangeException(nameof(data));
             var buffer = NativeMemory.Alloc((UIntPtr)(l + 8));
             data.CopyTo(new Span<byte>(buffer, l + 8));
-            return new RpcCommonErrorPackage(buffer, l + 8);
+            return new RpcCommonError(buffer, l + 8);
         }
     }
 
-    public static RpcCommonErrorPackage CreateFromMessage(int errorCode, string message)
+    public static RpcCommonError CreateFromMessage(int errorCode, string message)
     {
         ReadOnlySpan<byte> bytes = Encoding.UTF8.GetBytes(message);
         var buffer = NativeMemory.Alloc((UIntPtr)(8 + bytes.Length));
         *(int*)buffer = errorCode;
         *(int*)((byte*)buffer + 4) = bytes.Length;
         bytes.CopyTo(new Span<byte>((byte*)buffer + 8, bytes.Length));
-        return new RpcCommonErrorPackage(buffer, 8 + bytes.Length);
+        return new RpcCommonError(buffer, 8 + bytes.Length);
     }
 }
