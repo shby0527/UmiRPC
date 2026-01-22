@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Runtime.InteropServices;
+using Umi.Rpc.Base;
 
 namespace Umi.Rpc.Protocol;
 
@@ -33,7 +34,7 @@ public sealed unsafe class RpcBasic : RpcPackageBase
             ThrowIfDisposed();
             return *(uint*)Data;
         }
-        set
+        private set
         {
             ThrowIfDisposed();
             (*(uint*)Data) = value;
@@ -47,7 +48,7 @@ public sealed unsafe class RpcBasic : RpcPackageBase
             ThrowIfDisposed();
             return *((byte*)Data + 4);
         }
-        set
+        private set
         {
             ThrowIfDisposed();
             *((byte*)Data + 4) = value;
@@ -61,7 +62,7 @@ public sealed unsafe class RpcBasic : RpcPackageBase
             ThrowIfDisposed();
             return *(uint*)((byte*)Data + 5);
         }
-        set
+        private set
         {
             ThrowIfDisposed();
             (*(uint*)((byte*)Data + 5)) = value;
@@ -107,5 +108,15 @@ public sealed unsafe class RpcBasic : RpcPackageBase
         Span<byte> span = new(buffer, SIZE_OF_PACKAGE);
         data.CopyTo(span);
         return new RpcBasic(buffer);
+    }
+
+    public static RpcBasic CreateFromMessage(uint command)
+    {
+        return new RpcBasic()
+        {
+            Magic = UmiRpcConstants.MAGIC,
+            Version = UmiRpcConstants.VERSION,
+            Command = command
+        };
     }
 }
