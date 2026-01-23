@@ -137,7 +137,7 @@ public sealed unsafe class RpcAuthenticationMessage : RpcPackageBase
     {
         var length = 9; // 基础长度
         if (string.IsNullOrEmpty(username))
-            throw new ArgumentException($"{username} MUST not be empty or null", nameof(username));
+            throw new ArgumentException($"{nameof(username)} MUST not be empty or null", nameof(username));
         ReadOnlySpan<byte> ud = Encoding.UTF8.GetBytes(username);
         var pd = string.IsNullOrEmpty(password)
             ? ReadOnlySpan<byte>.Empty
