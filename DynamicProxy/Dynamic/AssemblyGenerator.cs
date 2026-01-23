@@ -78,12 +78,16 @@ public static class AssemblyGenerator
         /// <param name="key">key</param>
         /// <param name="defaultValue">默认值</param>
         /// <returns>值</returns>
-        private TValue GetOrDefault(TKey key, Func<TValue> defaultValue)
+        public TValue GetOrDefault(TKey key, Func<TValue> defaultValue)
         {
             if (dictionary.TryGetValue(key, out var value)) return value;
-            value = defaultValue();
-            dictionary.Add(key, value);
-            return value;
+            lock (dictionary)
+            {
+                if (dictionary.TryGetValue(key, out value)) return value;
+                value = defaultValue();
+                dictionary.Add(key, value);
+                return value;
+            }
         }
     }
 }

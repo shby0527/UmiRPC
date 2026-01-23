@@ -102,7 +102,11 @@ public class Tests
     [Test]
     public void TestTypeInfo()
     {
-        
+        var v = "abcdefghijklmnop";
+        var indexOf = v.IndexOf('b');
+        var methodInfo = typeof(string).GetMethod(nameof(string.IndexOf), [typeof(char)])!;
+        var method = DynamicMethodInvokeGenerator.GenerateInstanceMethod(methodInfo);
+        Assert.That(method(v, ['b']), Is.EqualTo(indexOf));
     }
 }
 

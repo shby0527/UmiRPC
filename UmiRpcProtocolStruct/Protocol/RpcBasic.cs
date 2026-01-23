@@ -22,7 +22,7 @@ public sealed unsafe class RpcBasic : RpcPackageBase
     {
     }
 
-    public RpcBasic()
+    private RpcBasic()
         : base(SIZE_OF_PACKAGE)
     {
     }
