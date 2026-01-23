@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using DynamicProxy;
@@ -118,9 +119,24 @@ public class Tests
         Assert.That(stmFunc([1]), Is.EqualTo(1));
         var caller = DynamicMethodInvokeGenerator.GenerateInstanceMethodCaller(genericMethod);
         Assert.That(caller.Call(testClass, [1, 2]), Is.EqualTo(1));
+        var expressionMethod = DynamicMethodInvokeGenerator.GenerateInstanceExpressionMethod(genericMethod);
+        Assert.That(expressionMethod(testClass, [1, 2]), Is.EqualTo(1));
         var sCaller = DynamicMethodInvokeGenerator.GenerateStaticMethodCaller(stm!);
         Assert.That(sCaller.Call([1]), Is.EqualTo(1));
+        var expressionStatic = DynamicMethodInvokeGenerator.GenerateStaticExpressionMethod(stm!);
+        Assert.That(expressionStatic([1]), Is.EqualTo(1));
     }
+
+
+    [Test]
+    public void ExpressionTest()
+    {
+        Expression<Func<object, object[], object>> expression = (a, b) =>
+            ((TestClassNoG)a).TestMethod((string)b[0], (string)b[1]);
+
+        Assert.That(expression, Is.Not.Null);
+    }
+
 
     [Test]
     public void PerformanceTest()
@@ -130,6 +146,7 @@ public class Tests
             typeof(TestClassNoG).GetMethod(nameof(TestClassNoG.TestMethod), [typeof(string), typeof(string)])!;
         var method = DynamicMethodInvokeGenerator.GenerateInstanceMethod(methodInfo);
         var caller = DynamicMethodInvokeGenerator.GenerateInstanceMethodCaller(methodInfo);
+        var expression = DynamicMethodInvokeGenerator.GenerateInstanceExpressionMethod(methodInfo);
         var sw = Stopwatch.StartNew();
         var func = ng.TestMethod;
         sw.Start();
@@ -178,7 +195,21 @@ public class Tests
         }
 
         sw.Stop();
+
         Debug.WriteLine("IL发射(生成接口)调用 10 x 10000000 耗时: {0}ms", sw.ElapsedMilliseconds);
+        sw.Reset();
+        sw.Start();
+        for (var i = 0; i < 10; i++)
+        {
+            for (var j = 0; j < 10000000; j++)
+            {
+                _ = expression(ng, ["a", "b"]);
+            }
+        }
+
+        sw.Stop();
+
+        Debug.WriteLine("表达式树生成调用 10 x 10000000 耗时: {0}ms", sw.ElapsedMilliseconds);
     }
 }
 

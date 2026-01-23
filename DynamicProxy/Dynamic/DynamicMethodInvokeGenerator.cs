@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using Umi.Proxy.Dynamic.Dynamic.DynamicCall;
@@ -14,6 +15,10 @@ public static class DynamicMethodInvokeGenerator
     private static readonly IDictionary<MethodInfo, IInstanceMethodCaller> InstanceMethodCallerCache;
     private static readonly IDictionary<MethodInfo, IStaticMethodCaller> StaticMethodCallers;
 
+    private static readonly IDictionary<MethodInfo, Func<object, object[], object>> InstanceMethodExpressionCache;
+
+    private static readonly IDictionary<MethodInfo, Func<object[], object>> StaticMethodExpressionCache;
+
     private static readonly ConstructorInfo ArgumentOutOfRangExceptionConstructor;
     private static readonly ConstructorInfo NullReferenceExceptionConstructor;
 
@@ -28,6 +33,8 @@ public static class DynamicMethodInvokeGenerator
     {
         InstanceMethodCache = new ConcurrentDictionary<MethodInfo, Func<object, object[], object>>();
         StaticMethodCache = new ConcurrentDictionary<MethodInfo, Func<object[], object>>();
+        InstanceMethodExpressionCache = new ConcurrentDictionary<MethodInfo, Func<object, object[], object>>();
+        StaticMethodExpressionCache = new ConcurrentDictionary<MethodInfo, Func<object[], object>>();
         InstanceMethodCallerCache = new ConcurrentDictionary<MethodInfo, IInstanceMethodCaller>();
         StaticMethodCallers = new ConcurrentDictionary<MethodInfo, IStaticMethodCaller>();
         InstanceMethodCallMethod = typeof(IInstanceMethodCaller)
@@ -48,6 +55,67 @@ public static class DynamicMethodInvokeGenerator
         var assemblyName = new AssemblyName("DynamicMethodCallers");
         var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
         ModuleBuilder = assemblyBuilder.DefineDynamicModule("DynamicMethodCallers.dll");
+    }
+
+    // 使用表达式树创建
+    public static Func<object, object[], object> GenerateInstanceExpressionMethod(MethodInfo methodInfo)
+    {
+        if (methodInfo is { IsStatic: true }
+            or { IsGenericMethodDefinition: true }
+            or { IsAbstract: true }
+            or { DeclaringType: null })
+            throw new NotSupportedException($"{nameof(methodInfo)} are not supported");
+        if (methodInfo.DeclaringType is { IsGenericTypeDefinition: true })
+            throw new InvalidOperationException("declare MUST close type");
+
+        return InstanceMethodExpressionCache.GetOrDefault(methodInfo, Create);
+
+        Func<object, object[], object> Create()
+        {
+            var parameterInfos = methodInfo.GetParameters();
+            IReadOnlyList<ParameterExpression> parameters =
+                [Expression.Parameter(typeof(object), "a"), Expression.Parameter(typeof(object[]), "b")];
+            Expression[] arguments = new Expression[parameterInfos.Length];
+            for (int i = 0; i < parameterInfos.Length; i++)
+            {
+                arguments[i] = Expression.Convert(Expression.ArrayAccess(parameters[1], [Expression.Constant(i)]),
+                    parameterInfos[i].ParameterType);
+            }
+
+            Expression body = Expression.Convert(Expression.Call(
+                Expression.Convert(parameters[0], methodInfo.DeclaringType),
+                methodInfo, arguments), typeof(object));
+            return Expression.Lambda<Func<object, object[], object>>(body, parameters).Compile();
+        }
+    }
+
+    public static Func<object[], object> GenerateStaticExpressionMethod(MethodInfo methodInfo)
+    {
+        if (methodInfo is { IsStatic: false }
+            or { IsGenericMethodDefinition: true }
+            or { IsAbstract: true }
+            or { DeclaringType: null })
+            throw new NotSupportedException($"{nameof(methodInfo)} are not supported");
+        if (methodInfo.DeclaringType is { IsGenericTypeDefinition: true })
+            throw new InvalidOperationException("declare MUST close type");
+
+        return StaticMethodExpressionCache.GetOrDefault(methodInfo, Create);
+
+        Func<object[], object> Create()
+        {
+            var parameterInfos = methodInfo.GetParameters();
+            IReadOnlyList<ParameterExpression> parameters =
+                [Expression.Parameter(typeof(object[]), "a")];
+            Expression[] arguments = new Expression[parameterInfos.Length];
+            for (int i = 0; i < parameterInfos.Length; i++)
+            {
+                arguments[i] = Expression.Convert(Expression.ArrayAccess(parameters[0], [Expression.Constant(i)]),
+                    parameterInfos[i].ParameterType);
+            }
+
+            Expression body = Expression.Convert(Expression.Call(methodInfo, arguments), typeof(object));
+            return Expression.Lambda<Func<object[], object>>(body, parameters).Compile();
+        }
     }
 
     // 静态的
