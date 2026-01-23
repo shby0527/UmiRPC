@@ -107,6 +107,11 @@ public class Tests
         var methodInfo = typeof(string).GetMethod(nameof(string.IndexOf), [typeof(char)])!;
         var method = DynamicMethodInvokeGenerator.GenerateInstanceMethod(methodInfo);
         Assert.That(method(v, ['b']), Is.EqualTo(indexOf));
+        TestClass<int> testClass = new();
+        var info = typeof(TestClass<int>).GetMethod(nameof(TestClass<int>.Test));
+        var genericMethod = info!.MakeGenericMethod(typeof(int));
+        var func = DynamicMethodInvokeGenerator.GenerateInstanceMethod(genericMethod);
+        Assert.That(func(testClass, [1, 2]), Is.EqualTo(1));
     }
 }
 
@@ -140,4 +145,12 @@ public class TestInvoker : IInvoker
 public interface ITest
 {
     float Test(float input);
+}
+
+public class TestClass<TU>
+{
+    public T Test<T>(T input, TU output)
+    {
+        return input;
+    }
 }
