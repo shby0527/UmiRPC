@@ -116,6 +116,10 @@ public class Tests
         Assert.That(func(testClass, [1, 2]), Is.EqualTo(1));
         var stmFunc = DynamicMethodInvokeGenerator.GenerateStaticMethod(stm!);
         Assert.That(stmFunc([1]), Is.EqualTo(1));
+        var caller = DynamicMethodInvokeGenerator.GenerateInstanceMethodCaller(genericMethod);
+        Assert.That(caller.Call(testClass, [1, 2]), Is.EqualTo(1));
+        var sCaller = DynamicMethodInvokeGenerator.GenerateStaticMethodCaller(stm!);
+        Assert.That(sCaller.Call([1]), Is.EqualTo(1));
     }
 
     [Test]
@@ -125,6 +129,7 @@ public class Tests
         var methodInfo =
             typeof(TestClassNoG).GetMethod(nameof(TestClassNoG.TestMethod), [typeof(string), typeof(string)])!;
         var method = DynamicMethodInvokeGenerator.GenerateInstanceMethod(methodInfo);
+        var caller = DynamicMethodInvokeGenerator.GenerateInstanceMethodCaller(methodInfo);
         var sw = Stopwatch.StartNew();
         var func = ng.TestMethod;
         sw.Start();
@@ -162,6 +167,18 @@ public class Tests
 
         sw.Stop();
         Debug.WriteLine("IL发射调用 10 x 10000000 耗时: {0}ms", sw.ElapsedMilliseconds);
+        sw.Reset();
+        sw.Start();
+        for (var i = 0; i < 10; i++)
+        {
+            for (var j = 0; j < 10000000; j++)
+            {
+                _ = caller.Call(ng, ["a", "b"]);
+            }
+        }
+
+        sw.Stop();
+        Debug.WriteLine("IL发射(生成接口)调用 10 x 10000000 耗时: {0}ms", sw.ElapsedMilliseconds);
     }
 }
 
