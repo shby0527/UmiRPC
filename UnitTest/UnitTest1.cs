@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using DynamicProxy;
 using Umi.Proxy.Dynamic.Aspect;
@@ -116,6 +117,52 @@ public class Tests
         var stmFunc = DynamicMethodInvokeGenerator.GenerateStaticMethod(stm!);
         Assert.That(stmFunc([1]), Is.EqualTo(1));
     }
+
+    [Test]
+    public void PerformanceTest()
+    {
+        TestClassNoG ng = new();
+        var methodInfo =
+            typeof(TestClassNoG).GetMethod(nameof(TestClassNoG.TestMethod), [typeof(string), typeof(string)])!;
+        var method = DynamicMethodInvokeGenerator.GenerateInstanceMethod(methodInfo);
+        var sw = Stopwatch.StartNew();
+        var func = ng.TestMethod;
+        sw.Start();
+        for (var i = 0; i < 10; i++)
+        {
+            for (var j = 0; j < 10000000; j++)
+            {
+                _ = func("a", "b");
+            }
+        }
+
+        sw.Stop();
+        Debug.WriteLine("原生方法调用 10 x 10000000 耗时 :{0}ms", sw.ElapsedMilliseconds);
+        sw.Reset();
+        sw.Start();
+        for (var i = 0; i < 10; i++)
+        {
+            for (var j = 0; j < 10000000; j++)
+            {
+                _ = methodInfo.Invoke(ng, ["a", "b"]);
+            }
+        }
+
+        sw.Stop();
+        Debug.WriteLine("反射调用 10 x 10000000 耗时: {0}ms", sw.ElapsedMilliseconds);
+        sw.Reset();
+        sw.Start();
+        for (var i = 0; i < 10; i++)
+        {
+            for (var j = 0; j < 10000000; j++)
+            {
+                _ = method(ng, ["a", "b"]);
+            }
+        }
+
+        sw.Stop();
+        Debug.WriteLine("IL发射调用 10 x 10000000 耗时: {0}ms", sw.ElapsedMilliseconds);
+    }
 }
 
 public class TestInterceptor : IInterceptor
@@ -148,6 +195,15 @@ public class TestInvoker : IInvoker
 public interface ITest
 {
     float Test(float input);
+}
+
+public class TestClassNoG
+{
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public string TestMethod(string s, string b)
+    {
+        return s + b;
+    }
 }
 
 public class TestClass<TU>

@@ -10,38 +10,20 @@ public static class DynamicMethodInvokeGenerator
 
     private static readonly IDictionary<MethodInfo, Func<object[], object>> StaticMethodCache;
 
-    private static readonly MethodInfo TypeOpEquals;
-    private static readonly MethodInfo ObjectGetTypeMethod;
-    private static readonly MethodInfo TypeGetTypeFromHandle;
-
     private static readonly ConstructorInfo ArgumentOutOfRangExceptionConstructor;
     private static readonly ConstructorInfo NullReferenceExceptionConstructor;
-    private static readonly ConstructorInfo InvalidOperationExceptionConstructor;
 
     static DynamicMethodInvokeGenerator()
     {
         InstanceMethodCache = new ConcurrentDictionary<MethodInfo, Func<object, object[], object>>();
         StaticMethodCache = new ConcurrentDictionary<MethodInfo, Func<object[], object>>();
-        TypeOpEquals = typeof(Type).GetMethod("op_Equality",
-                           BindingFlags.Static | BindingFlags.Public,
-                           [typeof(Type), typeof(Type)])
-                       ?? throw new InvalidOperationException("method not found");
-        ObjectGetTypeMethod = typeof(object).GetMethod(nameof(GetType))
-                              ?? throw new InvalidOperationException("method not found");
-        TypeGetTypeFromHandle = typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle),
-                                    BindingFlags.Static | BindingFlags.Public,
-                                    [typeof(RuntimeTypeHandle)])
-                                ?? throw new InvalidOperationException("can not found helper method");
+
         ArgumentOutOfRangExceptionConstructor = typeof(ArgumentOutOfRangeException)
                                                     .GetConstructor([typeof(string)])
                                                 ?? throw new InvalidOperationException("constructor( not found");
         NullReferenceExceptionConstructor = typeof(NullReferenceException)
                                                 .GetConstructor([typeof(string)])
                                             ?? throw new InvalidOperationException("constructor( not found");
-
-        InvalidOperationExceptionConstructor = typeof(InvalidOperationException)
-                                                   .GetConstructor([typeof(string)])
-                                               ?? throw new InvalidOperationException("constructor( not found");
     }
 
     // 静态的
@@ -126,7 +108,6 @@ public static class DynamicMethodInvokeGenerator
              */
             var throwNullLabel = il.DefineLabel();
             var throwOutIndex = il.DefineLabel();
-            var throwInvalidOp = il.DefineLabel();
             il.Emit(OpCodes.Ldnull);
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Beq, throwNullLabel); // if null == arg0 jmp ---> throwNullLabel
@@ -134,13 +115,6 @@ public static class DynamicMethodInvokeGenerator
             il.Emit(OpCodes.Ldlen);
             il.Emit(OpCodes.Ldc_I4, methodInfo.GetParameters().Length);
             il.Emit(OpCodes.Blt_Un, throwOutIndex);
-
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Callvirt, ObjectGetTypeMethod);
-            il.Emit(OpCodes.Ldtoken, methodInfo.DeclaringType);
-            il.Emit(OpCodes.Call, TypeGetTypeFromHandle);
-            il.Emit(OpCodes.Call, TypeOpEquals);
-            il.Emit(OpCodes.Brfalse, throwInvalidOp);
 
             // load this
             il.Emit(OpCodes.Ldarg_0);
@@ -168,10 +142,6 @@ public static class DynamicMethodInvokeGenerator
             il.MarkLabel(throwOutIndex);
             il.Emit(OpCodes.Ldstr, "arguments count not enough");
             il.Emit(OpCodes.Newobj, ArgumentOutOfRangExceptionConstructor);
-            il.Emit(OpCodes.Throw);
-            il.MarkLabel(throwInvalidOp);
-            il.Emit(OpCodes.Ldstr, "type not match to object");
-            il.Emit(OpCodes.Newobj, InvalidOperationExceptionConstructor);
             il.Emit(OpCodes.Throw);
             return method.CreateDelegate<Func<object, object[], object>>();
         }
