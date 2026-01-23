@@ -98,6 +98,12 @@ public class Tests
                 $"{nameof(msg2.KeySignedData)} is not equal {nameof(buffer)}");
         }
     }
+
+    [Test]
+    public void TestTypeInfo()
+    {
+        
+    }
 }
 
 public class TestInterceptor : IInterceptor

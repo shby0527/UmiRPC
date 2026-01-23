@@ -69,6 +69,9 @@ public sealed unsafe class RpcBasic : RpcPackageBase
         }
     }
 
+    /// <summary>
+    /// 服务端回复的包里，这个值不重要，它保持0或者任意值
+    /// </summary>
     public Span<byte> Session
     {
         get
