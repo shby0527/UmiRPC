@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DynamicProxy", "DynamicProx
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTest", "UnitTest\UnitTest.csproj", "{48E1936F-44EF-40B2-A282-E829E5BCA71E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UmiRpcImplement", "UmiRpcImplement\UmiRpcImplement.csproj", "{8FF92497-CD9F-4AF0-A83D-43D82B0413DF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UmiRpcServer", "UmiRpcServer\UmiRpcServer.csproj", "{8FF92497-CD9F-4AF0-A83D-43D82B0413DF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UmiRpcProtocolStruct", "UmiRpcProtocolStruct\UmiRpcProtocolStruct.csproj", "{B89A1108-B524-46C2-8C5A-18C37F59FE6C}"
 EndProject

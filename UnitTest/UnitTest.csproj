@@ -22,7 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DynamicProxy\DynamicProxy.csproj" />
-    <ProjectReference Include="..\UmiRpcImplement\UmiRpcImplement.csproj" />
+    <ProjectReference Include="..\UmiRpcServer\UmiRpcServer.csproj" />
   </ItemGroup>
 
 </Project>
