@@ -125,6 +125,9 @@ public class Tests
         Assert.That(sCaller.Call([1]), Is.EqualTo(1));
         var expressionStatic = DynamicMethodInvokeGenerator.GenerateStaticExpressionMethod(stm!);
         Assert.That(expressionStatic([1]), Is.EqualTo(1));
+        var info1 = typeof(TestClass<int>).GetMethod(nameof(TestClass<>.TestMethod))!;
+        var infoTest = DynamicMethodInvokeGenerator.GenerateInstanceExpressionMethod(info1);
+        infoTest(testClass, []);
     }
 
 
@@ -252,6 +255,11 @@ public class TestClassNoG
     {
         return s + b;
     }
+
+    public void Test()
+    {
+        
+    }
 }
 
 public class TestClass<TU>
@@ -259,6 +267,11 @@ public class TestClass<TU>
     public T Test<T>(T input, TU output)
     {
         return input;
+    }
+
+    public void TestMethod()
+    {
+        Thread.Sleep(500);
     }
 
     public static TU TestStat(TU input)

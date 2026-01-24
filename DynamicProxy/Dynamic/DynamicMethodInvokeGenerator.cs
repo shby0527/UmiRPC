@@ -82,9 +82,19 @@ public static class DynamicMethodInvokeGenerator
                     parameterInfos[i].ParameterType);
             }
 
-            Expression body = Expression.Convert(Expression.Call(
+            var callExpression = Expression.Call(
                 Expression.Convert(parameters[0], methodInfo.DeclaringType),
-                methodInfo, arguments), typeof(object));
+                methodInfo, arguments);
+            Expression body;
+            if (methodInfo.ReturnType != typeof(void))
+            {
+                body = Expression.Convert(callExpression, typeof(object));
+            }
+            else
+            {
+                body = Expression.Block(callExpression, Expression.Constant(null, typeof(object)));
+            }
+
             return Expression.Lambda<Func<object, object[], object>>(body, parameters).Compile();
         }
     }
@@ -113,7 +123,17 @@ public static class DynamicMethodInvokeGenerator
                     parameterInfos[i].ParameterType);
             }
 
-            Expression body = Expression.Convert(Expression.Call(methodInfo, arguments), typeof(object));
+            var callExpression = Expression.Call(methodInfo, arguments);
+            Expression body;
+            if (methodInfo.ReturnType != typeof(void))
+            {
+                body = Expression.Convert(callExpression, typeof(object));
+            }
+            else
+            {
+                body = Expression.Block(callExpression, Expression.Constant(null, typeof(object)));
+            }
+
             return Expression.Lambda<Func<object[], object>>(body, parameters).Compile();
         }
     }
@@ -129,9 +149,9 @@ public static class DynamicMethodInvokeGenerator
         if (methodInfo.DeclaringType is { IsGenericTypeDefinition: true })
             throw new InvalidOperationException("declare MUST close type");
 
-        return StaticMethodCache.GetOrDefault(methodInfo, CreateStaticMethod);
+        return StaticMethodCache.GetOrDefault(methodInfo, Create);
 
-        Func<object[], object> CreateStaticMethod()
+        Func<object[], object> Create()
         {
             DynamicMethod method = new("", typeof(object), [typeof(object[])]);
             var il = method.GetILGenerator();
@@ -183,9 +203,9 @@ public static class DynamicMethodInvokeGenerator
         if (methodInfo.DeclaringType is { IsGenericTypeDefinition: true })
             throw new InvalidOperationException("declare MUST close type");
 
-        return InstanceMethodCache.GetOrDefault(methodInfo, InterGenerateMethod);
+        return InstanceMethodCache.GetOrDefault(methodInfo, Create);
 
-        Func<object, object[], object> InterGenerateMethod()
+        Func<object, object[], object> Create()
         {
             DynamicMethod method = new("", typeof(object), [typeof(object), typeof(object[])]);
             var il = method.GetILGenerator();
