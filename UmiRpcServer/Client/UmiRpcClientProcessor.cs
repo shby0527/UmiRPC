@@ -9,7 +9,7 @@ public abstract class UmiRpcClientProcessor : IDisposable
 {
     private readonly Socket _socket;
 
-    private readonly SocketAsyncEventArgs _acceptArgs;
+    private readonly SocketAsyncEventArgs _receiveArgs;
 
     private readonly Pipe _pipe;
 
@@ -18,15 +18,15 @@ public abstract class UmiRpcClientProcessor : IDisposable
     protected UmiRpcClientProcessor(Socket socket)
     {
         _socket = socket;
-        _acceptArgs = new SocketAsyncEventArgs();
-        _acceptArgs.Completed += AcceptArgsOnCompleted;
-        _acceptArgs.SetBuffer(new byte[4096]);
+        _receiveArgs = new SocketAsyncEventArgs();
+        _receiveArgs.Completed += ReceivedArgsOnCompleted;
+        _receiveArgs.SetBuffer(new byte[4096]);
         _socket.ReceiveBufferSize = 4096;
         _socket.SendBufferSize = 4096;
         _pipe = new Pipe();
     }
 
-    private void AcceptArgsOnCompleted(object? sender, SocketAsyncEventArgs args)
+    private void ReceivedArgsOnCompleted(object? sender, SocketAsyncEventArgs args)
     {
         var writer = _pipe.Writer;
         if (args is not
@@ -41,12 +41,15 @@ public abstract class UmiRpcClientProcessor : IDisposable
         var memory = writer.GetSpan(args.BytesTransferred);
         args.MemoryBuffer[..args.BytesTransferred].Span.CopyTo(memory);
         writer.Advance(args.BytesTransferred);
-        _ = writer.FlushAsync().AsTask();
-
-        while (!_socket.ReceiveAsync(_acceptArgs))
-        {
-            AcceptArgsOnCompleted(this, _acceptArgs);
-        }
+        _ = writer.FlushAsync()
+            .AsTask()
+            .ContinueWith(_ =>
+            {
+                if (!_socket.ReceiveAsync(_receiveArgs))
+                {
+                    ReceivedArgsOnCompleted(this, _receiveArgs);
+                }
+            });
     }
 
     private async Task ProcessDataAsync()
@@ -76,9 +79,9 @@ public abstract class UmiRpcClientProcessor : IDisposable
     public void Start(LinkedListNode<UmiRpcClientProcessor> node)
     {
         _node = node;
-        while (!_socket.ReceiveAsync(_acceptArgs))
+        if (!_socket.ReceiveAsync(_receiveArgs))
         {
-            AcceptArgsOnCompleted(this, _acceptArgs);
+            ReceivedArgsOnCompleted(this, _receiveArgs);
         }
 
         _ = ProcessDataAsync();
@@ -101,8 +104,8 @@ public abstract class UmiRpcClientProcessor : IDisposable
         }
 
         _socket.Dispose();
-        _acceptArgs.Completed -= AcceptArgsOnCompleted;
-        _acceptArgs.Dispose();
+        _receiveArgs.Completed -= ReceivedArgsOnCompleted;
+        _receiveArgs.Dispose();
     }
 }
 

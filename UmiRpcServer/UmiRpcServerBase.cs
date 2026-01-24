@@ -57,7 +57,7 @@ public abstract class UmiRpcServerBase : IDisposable
         }
 
         _acceptArgs.AcceptSocket = null;
-        while (!_socket.AcceptAsync(_acceptArgs))
+        if (!_socket.AcceptAsync(_acceptArgs))
         {
             AcceptArgsOnCompleted(_socket, _acceptArgs);
         }
@@ -75,7 +75,7 @@ public abstract class UmiRpcServerBase : IDisposable
 
     public void Start()
     {
-        while (!_socket.AcceptAsync(_acceptArgs))
+        if (!_socket.AcceptAsync(_acceptArgs))
         {
             AcceptArgsOnCompleted(_socket, _acceptArgs);
         }
