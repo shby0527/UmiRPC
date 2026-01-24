@@ -214,6 +214,24 @@ public class Tests
 
         Debug.WriteLine("表达式树生成调用 10 x 10000000 耗时: {0}ms", sw.ElapsedMilliseconds);
     }
+
+
+    [Test]
+    public void AutoProxyTest()
+    {
+        var type = AssemblyGenerator.GetOrGenerateType(typeof(ITest));
+        IEnumerable<IInterceptor> interceptors = [new TestInterceptor()];
+        RandomRaisePublish publish = new();
+        var o = Activator.CreateInstance(type, new TestInvoker(), publish, interceptors);
+        Assert.That(o, Is.Not.Null);
+        Assert.That(o, Is.InstanceOf<ITest>());
+        var test = o as ITest;
+        var f = test!.Test(1);
+        Assert.That(f, Is.EqualTo(1));
+        test!.TestEvent += (sender, args) => Debug.WriteLine(sender!.ToString());
+        test!.TestEvent2 += (sender, args) => Debug.WriteLine(sender!.ToString());
+        publish.Raise();
+    }
 }
 
 public class TestInterceptor : IInterceptor
@@ -243,9 +261,55 @@ public class TestInvoker : IInvoker
     }
 }
 
+public class RandomRaisePublish : EventProcessorBase
+{
+    private readonly Dictionary<Guid, ISet<string>> _dictionary = new();
+
+    public override void Subscribe(IEventRaise raise, string eventName)
+    {
+        base.Subscribe(raise, eventName);
+        var collection = _dictionary.GetOrDefault(raise.RaiseUuid, () => new HashSet<string>());
+        collection.Add(eventName);
+    }
+
+    public override void Unsubscribe(IEventRaise raise, string eventName)
+    {
+        if (_dictionary.TryGetValue(raise.RaiseUuid, out var set))
+        {
+            set.Remove(eventName);
+            if (set.Count == 0)
+            {
+                _dictionary.Remove(raise.RaiseUuid);
+                _events.Remove(raise.RaiseUuid);
+            }
+        }
+    }
+
+    public void Raise()
+    {
+        foreach (var @event in _events)
+        {
+            if (@event.Value.TryGetTarget(out var target))
+            {
+                if (_dictionary.TryGetValue(target.RaiseUuid, out var set))
+                {
+                    foreach (var item in set)
+                    {
+                        target.RaiseEvent(item, EventArgs.Empty);
+                    }
+                }
+            }
+        }
+    }
+}
+
 public interface ITest
 {
     float Test(float input);
+
+    event EventHandler TestEvent;
+
+    event EventHandler TestEvent2;
 }
 
 public class TestClassNoG
@@ -258,7 +322,6 @@ public class TestClassNoG
 
     public void Test()
     {
-        
     }
 }
 
