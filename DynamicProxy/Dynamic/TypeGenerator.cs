@@ -267,6 +267,8 @@ internal class TypeGenerator
         _typeBuilder.DefineMethodOverride(methodBuilder, _raiseEvent);
         //public abstract void RaiseEvent(string @event, EventArgs args);
         var il = methodBuilder.GetILGenerator();
+        var lblClear = il.DefineLabel();
+        var lblEnd = il.DefineLabel();
         foreach (var item in allEvents)
         {
             var delegateInvoke = item.Value.FieldType.GetMethod("Invoke", BindingFlags.Public | BindingFlags.Instance);
@@ -286,12 +288,20 @@ internal class TypeGenerator
             il.Emit(OpCodes.Brfalse, lblF);
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldfld, item.Value);
+            il.Emit(OpCodes.Dup);
+            il.Emit(OpCodes.Ldnull);
+            il.Emit(OpCodes.Beq, lblClear);
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Callvirt, delegateInvoke);
+            il.Emit(OpCodes.Br, lblEnd);
             il.MarkLabel(lblF);
         }
 
+        il.Emit(OpCodes.Br, lblEnd);
+        il.MarkLabel(lblClear);
+        il.Emit(OpCodes.Pop);
+        il.MarkLabel(lblEnd);
         il.Emit(OpCodes.Ret);
         methodBuilder.SetImplementationFlags(MethodImplAttributes.IL);
     }

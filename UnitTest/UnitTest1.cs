@@ -230,6 +230,8 @@ public class Tests
         Assert.That(f, Is.EqualTo(1));
         test!.TestEvent += (sender, args) => Debug.WriteLine(sender!.ToString());
         test!.TestEvent2 += (sender, args) => Debug.WriteLine(sender!.ToString());
+        test!.TestEvent2 += (sender, args) => Debug.WriteLine(sender!.ToString());
+        test!.TestEvent2 += (sender, args) => Debug.WriteLine(sender!.ToString());
         publish.Raise();
     }
 }
