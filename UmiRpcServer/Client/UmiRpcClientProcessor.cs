@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.IO.Pipelines;
 using System.Net.Sockets;
 using Umi.Rpc.Base;
@@ -71,8 +72,31 @@ public abstract class UmiRpcClientProcessor : IDisposable
             if (basic.Magic != UmiRpcConstants.MAGIC) continue;
             if (basic.Version > UmiRpcConstants.VERSION) continue;
             //  后续的其他验证 逻辑
+            if (!SessionValid(basic.Session))
+            {
+                var code = GeneratedChallenge();
+                using var err =
+                    RpcCommonError.CreateFromMessage(UmiRpcConstants.NEED_AUTHENTICATION | code, "need authentication");
+                using var rtp = RpcBasic.CreateFromMessage(UmiRpcConstants.HANDSHAKE_RESULT);
+                rtp.Length = err.Memory.Length;
+                using var buffer = MemoryPool<byte>.Shared.Rent(rtp.Memory.Length + err.Memory.Length);
+                rtp.Memory.CopyTo(buffer.Memory.Span);
+                err.Memory.CopyTo(buffer.Memory[rtp.Memory.Length..].Span);
+                var total = rtp.Memory.Length + err.Memory.Length;
+                var send = 0;
+                while (total - send > 0)
+                {
+                    send += await _socket.SendAsync(buffer.Memory[send..total], SocketFlags.None);
+                }
+
+                continue;
+            }
         }
     }
+
+    protected abstract ushort GeneratedChallenge();
+
+    protected abstract bool SessionValid(scoped ReadOnlySpan<byte> session);
 
     public event EventHandler<UmiRpcClientCloseEventArgs>? Close;
 

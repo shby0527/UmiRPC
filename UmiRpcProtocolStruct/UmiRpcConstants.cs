@@ -10,6 +10,10 @@ public static class UmiRpcConstants
     // 版本号固定这个
     public const byte VERSION = 0x01;
 
+    // ///////////////////////////////////////////////////
+
+    // 需要认证
+    public const int NEED_AUTHENTICATION = 0x7F_01_00_00;
 
     ///////////////////////////////////////////////////////
     // 下面开始 command 
