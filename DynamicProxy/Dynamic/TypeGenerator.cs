@@ -292,7 +292,7 @@ internal class TypeGenerator
             il.Emit(OpCodes.Ldnull);
             il.Emit(OpCodes.Beq, lblClear);
             il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldarg_2);
             il.Emit(OpCodes.Callvirt, delegateInvoke);
             il.Emit(OpCodes.Br, lblEnd);
             il.MarkLabel(lblF);

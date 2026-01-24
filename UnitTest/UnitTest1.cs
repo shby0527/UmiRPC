@@ -228,8 +228,8 @@ public class Tests
         var test = o as ITest;
         var f = test!.Test(1);
         Assert.That(f, Is.EqualTo(1));
-        test!.TestEvent += (sender, args) => Debug.WriteLine(sender!.ToString());
-        test!.TestEvent2 += (sender, args) => Debug.WriteLine(sender!.ToString());
+        test!.TestEvent += (sender, args) => Assert.That(args, Is.InstanceOf<EventArgs>());
+        test!.TestEvent2 += (sender, args) => Assert.That(sender, Is.EqualTo(test));
         test!.TestEvent2 += (sender, args) => Debug.WriteLine(sender!.ToString());
         test!.TestEvent2 += (sender, args) => Debug.WriteLine(sender!.ToString());
         publish.Raise();
