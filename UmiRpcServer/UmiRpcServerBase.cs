@@ -48,12 +48,13 @@ public abstract class UmiRpcServerBase : IDisposable
             return;
         }
 
+
         var client = CreateClientProcessor(args.AcceptSocket);
         lock (_lock)
         {
-            var node = _clientProcessors.AddLast(client);
+            _clientProcessors.AddLast(client.Node);
             client.Close += ClientOnClose;
-            client.Start(node);
+            client.Start();
         }
 
         _acceptArgs.AcceptSocket = null;
@@ -99,5 +100,7 @@ public abstract class UmiRpcServerBase : IDisposable
         _socket.Dispose();
         _acceptArgs.Completed -= AcceptArgsOnCompleted;
         _acceptArgs.Dispose();
+        GC.SuppressFinalize(this);
     }
+    
 }

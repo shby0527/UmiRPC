@@ -12,8 +12,15 @@ public static class UmiRpcConstants
 
     // ///////////////////////////////////////////////////
 
+    public const int UNKNOWN_PROTOCOL = unchecked((int)0x80_00_00_01);
+
+    public const int UNSPORTED_VERSION = unchecked((int)0x80_00_00_02);
+
     // 需要认证
-    public const int NEED_AUTHENTICATION = 0x7F_01_00_00;
+    public const int NEED_AUTHENTICATION = 0x7F_00_00_00;
+
+    public const int SESSION_CONFLICT = unchecked((int)0x80_00_00_10);
+    public const int SESSION_ERROR = unchecked((int)0x80_00_00_11);
 
     ///////////////////////////////////////////////////////
     // 下面开始 command 
@@ -40,6 +47,7 @@ public static class UmiRpcConstants
      *      <--------------------------- call method not found (方法没找到
      *      <--------------------------- call event raise (远程事件触发【暂时未实现】
      */
+    public const uint COMMON_ERROR = 0xEF_FF_FF_FF;
     public const uint HANDSHAKE = 0x00; // 无payload
     public const uint HANDSHAKE_RESULT = 0x01; // payload 为 common error
     public const uint HANDSHAKE_CONTINUE = 0x02; // 无 payload
