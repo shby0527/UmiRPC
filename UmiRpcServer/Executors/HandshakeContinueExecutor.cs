@@ -16,7 +16,7 @@ internal sealed class HandshakeContinueExecutor(IAuthenticationService authentic
             var result = await reader.ReadAtLeastAsync(basic.Length);
             if (result.IsCanceled || result.IsCompleted)
             {
-                return new ExecuteResult()
+                return new ExecuteResult
                 {
                     ResultCommand = UmiRpcConstants.COMMON_ERROR,
                     CloseConnection = true,
@@ -32,28 +32,28 @@ internal sealed class HandshakeContinueExecutor(IAuthenticationService authentic
         if (!authenticationService.NeedsAuthentication)
         {
             // 不需要认证，我们就跳过认证步骤 直接  idle
-            return new ExecuteResult()
+            return new ExecuteResult
             {
                 ResultCommand = UmiRpcConstants.HANDSHAKE_CONTINUE_ACK,
                 CloseConnection = false,
                 NextState = ClientState.Idle,
-                Package = RpcCommonError.CreateFromMessage(0, "Success")
+                Package = null
             };
         }
 
         if (authenticationService.SessionCheck(basic.Session))
         {
             // 对于这个命令，这意味着需要复用session
-            return new ExecuteResult()
+            return new ExecuteResult
             {
                 ResultCommand = UmiRpcConstants.HANDSHAKE_CONTINUE_ACK,
                 CloseConnection = false,
                 NextState = ClientState.Idle,
-                Package = RpcCommonError.CreateFromMessage(0, "Success")
+                Package = null
             };
         }
 
-        return new ExecuteResult()
+        return new ExecuteResult
         {
             ResultCommand = UmiRpcConstants.COMMON_ERROR,
             CloseConnection = true,

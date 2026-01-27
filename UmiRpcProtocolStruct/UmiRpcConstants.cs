@@ -59,8 +59,10 @@ public static class UmiRpcConstants
     public const uint HANDSHAKE_RESULT = 0x01; // payload 为 common error
     public const uint HANDSHAKE_CONTINUE = 0x02; // 无 payload
     public const uint HANDSHAKE_CONTINUE_ACK = 0x03; // 无 payload
-    public const uint METADATA_CONSENT = 0x10_01; // payload 待定
-    public const uint METADATA_RESULT = 0x10_02; // payload 待定
+
+    // metadata 数据传输（数据由metadata服务解析)
+    public const uint METADATA_CONSENT = 0x10_01; // payload 为 RpcMetadataConsent
+    public const uint METADATA_RESULT = 0x10_02; // payload 为 RpcMetadataConsent
 
     public const uint AUTHENTICATION = 0x01_00_00; // payload 为 Authentication
     public const uint AUTHENTICATION_RESULT = 0x01_00_01; // payload 为 Common Error

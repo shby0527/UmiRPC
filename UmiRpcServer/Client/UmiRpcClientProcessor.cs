@@ -19,6 +19,8 @@ public abstract class UmiRpcClientProcessor : IDisposable
 
     private readonly IReadOnlyDictionary<ClientState, IReadOnlyDictionary<uint, IServerExecutor>> _executors;
 
+    private readonly IServerExecutor _defaultExecutor = new DefaultExecutor();
+
     private ClientState _state = ClientState.Init;
 
     public ClientState State => _state;
@@ -180,19 +182,7 @@ public abstract class UmiRpcClientProcessor : IDisposable
                     }
                 }
 
-                // default executor 
-                // 默认仅消耗数据包，然后丢弃它
-                if (basic.Length <= 0) continue;
-                var errData = await reader.ReadAtLeastAsync(basic.Length);
-                if (errData is { IsCanceled: true } or { IsCompleted: true })
-                {
-                    reader.AdvanceTo(errData.Buffer.End);
-                    await reader.CompleteAsync();
-                    return;
-                }
-
-                var sequencePosition = errData.Buffer.GetPosition(basic.Length);
-                reader.AdvanceTo(sequencePosition);
+                _ = await _defaultExecutor.ExecuteCommandAsync(basic, reader);
             }
         }
         catch (Exception)

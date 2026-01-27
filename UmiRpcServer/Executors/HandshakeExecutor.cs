@@ -16,7 +16,7 @@ internal sealed class HandshakeExecutor(IAuthenticationService authenticationSer
             var result = await reader.ReadAtLeastAsync(basic.Length);
             if (result.IsCanceled || result.IsCompleted)
             {
-                return new ExecuteResult()
+                return new ExecuteResult
                 {
                     ResultCommand = UmiRpcConstants.COMMON_ERROR,
                     CloseConnection = true,
@@ -32,7 +32,7 @@ internal sealed class HandshakeExecutor(IAuthenticationService authenticationSer
         if (!authenticationService.NeedsAuthentication)
         {
             // 不需要认证，我们就跳过认证步骤 直接  协商元数据
-            return new ExecuteResult()
+            return new ExecuteResult
             {
                 ResultCommand = UmiRpcConstants.HANDSHAKE_RESULT,
                 CloseConnection = false,
@@ -44,7 +44,7 @@ internal sealed class HandshakeExecutor(IAuthenticationService authenticationSer
         if (authenticationService.SessionCheck(basic.Session))
         {
             // session 错误，要求重新握手
-            return new ExecuteResult()
+            return new ExecuteResult
             {
                 ResultCommand = UmiRpcConstants.HANDSHAKE_RESULT,
                 CloseConnection = false,
@@ -59,7 +59,7 @@ internal sealed class HandshakeExecutor(IAuthenticationService authenticationSer
             code |= RpcAuthenticationMessage.LOGIN_PASSWORD << 16;
         if (authenticationService.KeyAuthenticationEnabled)
             code |= (RpcAuthenticationMessage.LOGIN_KEY_SIGNED << 16) | authenticationService.GenerateChallengeCode();
-        return new ExecuteResult()
+        return new ExecuteResult
         {
             ResultCommand = UmiRpcConstants.HANDSHAKE_RESULT,
             CloseConnection = false,
