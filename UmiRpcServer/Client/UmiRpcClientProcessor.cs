@@ -4,6 +4,7 @@ using System.IO.Pipelines;
 using System.Net.Sockets;
 using Umi.Rpc.Base;
 using Umi.Rpc.Protocol;
+using Umi.Rpc.Server.Exceptions;
 using Umi.Rpc.Server.Executors;
 
 namespace Umi.Rpc.Server.Client;
@@ -41,6 +42,15 @@ public abstract class UmiRpcClientProcessor : IDisposable
     private IReadOnlyDictionary<ClientState, IReadOnlyDictionary<uint, IServerExecutor>> RegisterSystemExecutor()
     {
         var extensionsExecutors = RegisterExtensionsExecutors();
+        // 合规性检查
+        foreach (var executor in extensionsExecutors)
+        {
+            if (executor.Key is not (>= UmiRpcConstants.EXTENSIONS_BEGIN and <= UmiRpcConstants.EXTENSIONS_END))
+            {
+                throw new ProtocolCommandConflictException($"{nameof(executor.Key)} is out of Extension Range");
+            }
+        }
+
         var dic = new Dictionary<ClientState, IReadOnlyDictionary<uint, IServerExecutor>>
         {
             {
@@ -54,6 +64,16 @@ public abstract class UmiRpcClientProcessor : IDisposable
                     {
                         UmiRpcConstants.HANDSHAKE_CONTINUE,
                         new HandshakeContinueExecutor(ServiceFactory.AuthenticationService)
+                    }
+                }.ToImmutableDictionary()
+            },
+            {
+                ClientState.Authentication,
+                new Dictionary<uint, IServerExecutor>
+                {
+                    {
+                        UmiRpcConstants.AUTHENTICATION,
+                        new AuthenticationExecutor(ServiceFactory.AuthenticationService)
                     }
                 }.ToImmutableDictionary()
             },
@@ -130,7 +150,7 @@ public abstract class UmiRpcClientProcessor : IDisposable
                 {
                     // 版本不正确
                     using var msg =
-                        RpcCommonError.CreateFromMessage(UmiRpcConstants.UNSPORTED_VERSION, "unsported version");
+                        RpcCommonError.CreateFromMessage(UmiRpcConstants.UNSUPPORTED_VERSION, "unsupported version");
                     await SendingPackage(UmiRpcConstants.COMMON_ERROR, msg);
                     Stop();
                     return;
@@ -176,14 +196,14 @@ public abstract class UmiRpcClientProcessor : IDisposable
     }
 
     // ReSharper disable once MemberCanBePrivate.Global
-    protected async Task SendingPackage<T>(uint command, T package) where T : RpcPackageBase
+    protected async ValueTask SendingPackage<T>(uint command, T? package = null) where T : RpcPackageBase
     {
         using var basic = RpcBasic.CreateFromMessage(command);
-        basic.Length = package.Memory.Length;
-        var totalLength = basic.Memory.Length + package.Memory.Length;
+        basic.Length = package?.Memory.Length ?? 0;
+        var totalLength = basic.Memory.Length + basic.Length;
         using var memory = MemoryPool<byte>.Shared.Rent(totalLength);
         basic.Memory.CopyTo(memory.Memory.Span);
-        package.Memory.CopyTo(memory.Memory[basic.Memory.Length..].Span);
+        package?.Memory.CopyTo(memory.Memory[basic.Memory.Length..].Span);
         var send = 0;
         while (send < totalLength)
         {

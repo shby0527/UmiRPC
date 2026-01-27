@@ -21,6 +21,11 @@ public sealed unsafe class RpcAuthenticationMessage : RpcPackageBase
     // 密钥登陆时，我们将 {"username": username, "code": {CommonError.Code 低 2 字节作为挑战码(1分钟内有效)} } 进行签名
     // 握手后返回的 RpcCommonError 的 Code 的高2字节，表示服务器支持的登陆类型（0x1 or 0x2 or (0x1|0x2)
 
+    // ReSharper disable InconsistentNaming
+    public const byte LOGIN_PASSWORD = 0x1;
+    public const byte LOGIN_KEY_SIGNED = 0x2;
+    // ReSharper restore InconsistentNaming
+
     private RpcAuthenticationMessage(void* data, int size)
         : base(data, size)
     {

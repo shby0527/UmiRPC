@@ -11,7 +11,7 @@ public interface IServerExecutor
 
 public readonly struct ExecuteResult
 {
-    public required RpcPackageBase Package { get; init; }
+    public RpcPackageBase? Package { get; init; }
 
     public required uint ResultCommand { get; init; }
 

@@ -14,13 +14,20 @@ public static class UmiRpcConstants
 
     public const int UNKNOWN_PROTOCOL = unchecked((int)0x80_00_00_01);
 
-    public const int UNSPORTED_VERSION = unchecked((int)0x80_00_00_02);
+    public const int UNSUPPORTED_VERSION = unchecked((int)0x80_00_00_02);
+
+
+    public const int CONNECTION_CLOSED = unchecked((int)0xFF_FF_FF_FF);
 
     // 需要认证
     public const int NEED_AUTHENTICATION = 0x7F_00_00_00;
 
     public const int SESSION_CONFLICT = unchecked((int)0x80_00_00_10);
     public const int SESSION_ERROR = unchecked((int)0x80_00_00_11);
+
+
+    public const int AUTHENTICATION_REQUIRED = unchecked((int)0x80_00_00_20);
+    public const int AUTHENTICATION_FAILURE = unchecked((int)0x80_00_00_21);
 
     ///////////////////////////////////////////////////////
     // 下面开始 command 
@@ -91,5 +98,6 @@ public static class UmiRpcConstants
     #endregion
 
 
-    public const uint EXTENSIONS = 0x80_00_00_00; // 扩展区 0x80000000 - 0x8FFFFFFF
+    public const uint EXTENSIONS_BEGIN = 0x80_00_00_00; // 扩展区 0x80000000 - 0x8FFFFFFF
+    public const uint EXTENSIONS_END = 0x8F_FF_FF_FF; // 扩展区 0x80000000 - 0x8FFFFFFF
 }

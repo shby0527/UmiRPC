@@ -14,6 +14,17 @@ internal sealed class HandshakeContinueExecutor(IAuthenticationService authentic
         if (basic.Length > 0)
         {
             var result = await reader.ReadAtLeastAsync(basic.Length);
+            if (result.IsCanceled || result.IsCompleted)
+            {
+                return new ExecuteResult()
+                {
+                    ResultCommand = UmiRpcConstants.COMMON_ERROR,
+                    CloseConnection = true,
+                    NextState = ClientState.Closed,
+                    Package = RpcCommonError.CreateFromMessage(UmiRpcConstants.CONNECTION_CLOSED, "Connection Closed")
+                };
+            }
+
             var position = result.Buffer.GetPosition(basic.Length);
             reader.AdvanceTo(position);
         }
@@ -23,7 +34,7 @@ internal sealed class HandshakeContinueExecutor(IAuthenticationService authentic
             // 不需要认证，我们就跳过认证步骤 直接  idle
             return new ExecuteResult()
             {
-                ResultCommand = UmiRpcConstants.HANDSHAKE_RESULT,
+                ResultCommand = UmiRpcConstants.HANDSHAKE_CONTINUE_ACK,
                 CloseConnection = false,
                 NextState = ClientState.Idle,
                 Package = RpcCommonError.CreateFromMessage(0, "Success")
