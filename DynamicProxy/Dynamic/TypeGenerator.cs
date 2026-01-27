@@ -169,13 +169,8 @@ internal class TypeGenerator
 
     private void AddCustomAttribute()
     {
-        var uuid = Guid.NewGuid().ToString("D");
-        ReadOnlySpan<byte> strBytes = Encoding.ASCII.GetBytes(uuid);
-        Span<byte> blob = stackalloc byte[5 + strBytes.Length];
-        blob[0] = 0x01;
-        blob[2] = (byte)strBytes.Length;
-        strBytes.CopyTo(blob[3..]);
-        _typeBuilder.SetCustomAttribute(_attributeConstructor, blob.ToArray());
+        _typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(_attributeConstructor,
+            [Guid.NewGuid().ToString("D")]));
     }
 
     private void GeneratedEvents()
