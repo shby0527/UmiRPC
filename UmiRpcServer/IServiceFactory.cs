@@ -1,4 +1,4 @@
-using Umi.Rpc.Server.Authentications;
+using Umi.Rpc.Server.Services;
 
 namespace Umi.Rpc.Server;
 

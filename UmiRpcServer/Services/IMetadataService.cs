@@ -1,4 +1,4 @@
-namespace Umi.Rpc.Server.Authentications;
+namespace Umi.Rpc.Server.Services;
 
 public interface IMetadataService
 {

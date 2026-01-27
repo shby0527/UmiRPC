@@ -15,6 +15,23 @@ public class AutoProxyTest
     }
 
     [Test]
+    public void Test1()
+    {
+        var type = AssemblyGenerator.GetOrGenerateType(typeof(ITest));
+        IEnumerable<IInterceptor> interceptors = [new TestInterceptor()];
+        var instance = Activator.CreateInstance(type, new TestInvoker(), interceptors);
+        if (instance is ITest test)
+        {
+            var parameter = 20f;
+            var f = test.Test(parameter);
+            Assert.That(f, Is.EqualTo(parameter), $"{f} should be {parameter}");
+            return;
+        }
+
+        Assert.Fail("instance is null or not ITest");
+    }
+
+    [Test]
     public void TestTypeInfo()
     {
         var v = "abcdefghijklmnop";

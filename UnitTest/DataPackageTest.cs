@@ -1,33 +1,14 @@
 ﻿using System.Security.Cryptography;
-using Umi.Proxy.Dynamic.Aspect;
-using Umi.Proxy.Dynamic.Dynamic;
 using Umi.Rpc.Base;
 using Umi.Rpc.Protocol;
 
 namespace UnitTest;
 
-public class Tests
+public class DataPackageTest
 {
     [SetUp]
     public void Setup()
     {
-    }
-
-    [Test]
-    public void Test1()
-    {
-        var type = AssemblyGenerator.GetOrGenerateType(typeof(ITest));
-        IEnumerable<IInterceptor> interceptors = [new TestInterceptor()];
-        var instance = Activator.CreateInstance(type, new TestInvoker(), interceptors);
-        if (instance is ITest test)
-        {
-            var parameter = 20f;
-            var f = test.Test(parameter);
-            Assert.That(f, Is.EqualTo(parameter), $"{f} should be {parameter}");
-            return;
-        }
-
-        Assert.Fail("instance is null or not ITest");
     }
 
     [Test]
