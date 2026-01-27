@@ -270,34 +270,38 @@ public class RandomRaisePublish : EventProcessorBase
     public override void Subscribe(IEventRaise raise, string eventName)
     {
         base.Subscribe(raise, eventName);
-        var collection = _dictionary.GetOrDefault(raise.RaiseUuid, () => new HashSet<string>());
+        var collection = _dictionary.GetOrDefault(raise.ObjectUuid, () => new HashSet<string>());
         collection.Add(eventName);
     }
 
     public override void Unsubscribe(IEventRaise raise, string eventName)
     {
-        if (_dictionary.TryGetValue(raise.RaiseUuid, out var set))
+        if (_dictionary.TryGetValue(raise.ObjectUuid, out var set))
         {
             set.Remove(eventName);
             if (set.Count == 0)
             {
-                _dictionary.Remove(raise.RaiseUuid);
-                _events.Remove(raise.RaiseUuid);
+                _dictionary.Remove(raise.ObjectUuid);
+                _events.TryRemove(raise.RaiseUuid, out var dic);
+                dic?.TryRemove(raise.ObjectUuid, out _);
             }
         }
     }
 
     public void Raise()
     {
-        foreach (var @event in _events)
+        foreach (var type in _events)
         {
-            if (@event.Value.TryGetTarget(out var target))
+            foreach (var reference in type.Value)
             {
-                if (_dictionary.TryGetValue(target.RaiseUuid, out var set))
+                if (reference.Value.TryGetTarget(out var target))
                 {
-                    foreach (var item in set)
+                    if (_dictionary.TryGetValue(target.ObjectUuid, out var set))
                     {
-                        target.RaiseEvent(item, EventArgs.Empty);
+                        foreach (var e in set)
+                        {
+                            target.RaiseEvent(e, EventArgs.Empty);
+                        }
                     }
                 }
             }

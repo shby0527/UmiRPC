@@ -78,6 +78,12 @@ public abstract class UmiRpcClientProcessor : IDisposable
                 }.ToImmutableDictionary()
             },
             {
+                ClientState.MetadataConsent,
+                new Dictionary<uint, IServerExecutor>
+                {
+                }.ToImmutableDictionary()
+            },
+            {
                 ClientState.Idle,
                 new Dictionary<uint, IServerExecutor>(extensionsExecutors)
                 {

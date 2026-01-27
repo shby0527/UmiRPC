@@ -8,16 +8,17 @@ namespace Umi.Proxy.Dynamic.Dynamic;
 
 public static class DynamicMethodInvokeGenerator
 {
-    private static readonly IDictionary<MethodInfo, Func<object, object[], object>> InstanceMethodCache;
+    private static readonly ConcurrentDictionary<MethodInfo, Func<object, object[], object>> InstanceMethodCache;
 
-    private static readonly IDictionary<MethodInfo, Func<object[], object>> StaticMethodCache;
+    private static readonly ConcurrentDictionary<MethodInfo, Func<object[], object>> StaticMethodCache;
 
-    private static readonly IDictionary<MethodInfo, IInstanceMethodCaller> InstanceMethodCallerCache;
-    private static readonly IDictionary<MethodInfo, IStaticMethodCaller> StaticMethodCallers;
+    private static readonly ConcurrentDictionary<MethodInfo, IInstanceMethodCaller> InstanceMethodCallerCache;
+    private static readonly ConcurrentDictionary<MethodInfo, IStaticMethodCaller> StaticMethodCallers;
 
-    private static readonly IDictionary<MethodInfo, Func<object, object[], object>> InstanceMethodExpressionCache;
+    private static readonly ConcurrentDictionary<MethodInfo, Func<object, object[], object>>
+        InstanceMethodExpressionCache;
 
-    private static readonly IDictionary<MethodInfo, Func<object[], object>> StaticMethodExpressionCache;
+    private static readonly ConcurrentDictionary<MethodInfo, Func<object[], object>> StaticMethodExpressionCache;
 
     private static readonly ConstructorInfo ArgumentOutOfRangExceptionConstructor;
     private static readonly ConstructorInfo NullReferenceExceptionConstructor;
@@ -68,7 +69,7 @@ public static class DynamicMethodInvokeGenerator
         if (methodInfo.DeclaringType is { IsGenericTypeDefinition: true })
             throw new InvalidOperationException("declare MUST close type");
 
-        return InstanceMethodExpressionCache.GetOrDefault(methodInfo, Create);
+        return InstanceMethodExpressionCache.GetOrAdd(methodInfo, _ => Create());
 
         Func<object, object[], object> Create()
         {
@@ -109,7 +110,7 @@ public static class DynamicMethodInvokeGenerator
         if (methodInfo.DeclaringType is { IsGenericTypeDefinition: true })
             throw new InvalidOperationException("declare MUST close type");
 
-        return StaticMethodExpressionCache.GetOrDefault(methodInfo, Create);
+        return StaticMethodExpressionCache.GetOrAdd(methodInfo, _ => Create());
 
         Func<object[], object> Create()
         {
@@ -149,7 +150,7 @@ public static class DynamicMethodInvokeGenerator
         if (methodInfo.DeclaringType is { IsGenericTypeDefinition: true })
             throw new InvalidOperationException("declare MUST close type");
 
-        return StaticMethodCache.GetOrDefault(methodInfo, Create);
+        return StaticMethodCache.GetOrAdd(methodInfo, _ => Create());
 
         Func<object[], object> Create()
         {
@@ -203,7 +204,7 @@ public static class DynamicMethodInvokeGenerator
         if (methodInfo.DeclaringType is { IsGenericTypeDefinition: true })
             throw new InvalidOperationException("declare MUST close type");
 
-        return InstanceMethodCache.GetOrDefault(methodInfo, Create);
+        return InstanceMethodCache.GetOrAdd(methodInfo, _ => Create());
 
         Func<object, object[], object> Create()
         {
@@ -269,6 +270,8 @@ public static class DynamicMethodInvokeGenerator
         if (methodInfo.DeclaringType is { IsGenericTypeDefinition: true })
             throw new InvalidOperationException("declare MUST close type");
 
+        return StaticMethodCallers.GetOrAdd(methodInfo, _ => Create());
+
         IStaticMethodCaller Create()
         {
             var typeBuilder = ModuleBuilder.DefineType(
@@ -322,8 +325,6 @@ public static class DynamicMethodInvokeGenerator
             return Activator.CreateInstance(typeInfo) as IStaticMethodCaller
                    ?? throw new NotSupportedException($"{nameof(IStaticMethodCaller)} is not supported");
         }
-
-        return StaticMethodCallers.GetOrDefault(methodInfo, Create);
     }
 
     public static IInstanceMethodCaller GenerateInstanceMethodCaller(MethodInfo methodInfo)
@@ -337,7 +338,7 @@ public static class DynamicMethodInvokeGenerator
             throw new InvalidOperationException("declare MUST close type");
 
 
-        return InstanceMethodCallerCache.GetOrDefault(methodInfo, Create);
+        return InstanceMethodCallerCache.GetOrAdd(methodInfo, _ => Create());
 
         IInstanceMethodCaller Create()
         {

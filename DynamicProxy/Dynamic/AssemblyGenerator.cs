@@ -12,7 +12,7 @@ public static class AssemblyGenerator
 
     public static string NameSpacePrefix => $"{NAME_SPACE_PREFIX}.{Suffix}";
 
-    private static readonly IDictionary<Type, Type> GeneratedTypes;
+    private static readonly ConcurrentDictionary<Type, Type> GeneratedTypes;
 
     private static readonly ModuleBuilder ModuleBuilder;
 
@@ -33,7 +33,7 @@ public static class AssemblyGenerator
             throw new ArgumentException($"{type.FullName} is not an interface");
         }
 
-        return GeneratedTypes.GetOrDefault(type, () => GenerateType(type));
+        return GeneratedTypes.GetOrAdd(type, GenerateType);
     }
 
 
