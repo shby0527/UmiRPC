@@ -182,17 +182,18 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
             offset += item.Value.Length;
         }
 
+        var beginOfService = buffer + 16;
         // 还要修改一下内存
         for (var i = 0; i < metadata.Length; i++)
         {
             var ol = dic[metadata[i].ServiceName];
-            *(int*)(buffer + 16 + i * sizeof(RpcMetadataService)) = metadata[i].Version;
-            *(int*)(buffer + 16 + i * sizeof(RpcMetadataService) + 4) = ol.Length;
-            *(int*)(buffer + 16 + i * sizeof(RpcMetadataService) + 8) = ol.Offset;
-            *(long*)(buffer + 16 + i * sizeof(RpcMetadataService) + 12) = metadata[i].TransportType;
+            *(int*)(beginOfService + i * sizeof(RpcMetadataService)) = metadata[i].Version;
+            *(int*)(beginOfService + i * sizeof(RpcMetadataService) + 4) = ol.Length;
+            *(int*)(beginOfService + i * sizeof(RpcMetadataService) + 8) = ol.Offset;
+            *(long*)(beginOfService + i * sizeof(RpcMetadataService) + 12) = metadata[i].TransportType;
         }
 
-        var beginOfTypeMapping = buffer + 16 + metadata.Length * sizeof(RpcMetadataService);
+        var beginOfTypeMapping = beginOfService + metadata.Length * sizeof(RpcMetadataService);
         for (var i = 0; i < typeMappings.Length; i++)
         {
             var sourceOl = dic[typeMappings[i].Source];
@@ -255,7 +256,11 @@ public readonly struct RpcMetadataService
     /// </summary>
     [FieldOffset(13)] public readonly byte Timeout;
 
-    [FieldOffset(14)] public readonly byte Reserve1;
+    /// <summary>
+    /// 是否开启调用结果/参数CRC校验
+    /// </summary>
+    [FieldOffset(14)] public readonly byte CRC32;
+
     [FieldOffset(15)] public readonly byte Reserve2;
     [FieldOffset(16)] public readonly byte Reserve3;
     [FieldOffset(17)] public readonly byte Reserve4;

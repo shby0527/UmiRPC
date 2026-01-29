@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.Dynamic;
+using System.Security.Cryptography;
 using Umi.Rpc.Base;
 using Umi.Rpc.Protocol;
 
@@ -146,5 +147,15 @@ public class DataPackageTest
                         reload.RpcMetadataTypeMappings[i].TargetTypeLength)));
             }
         }
+    }
+
+
+    [Test]
+    public void DynamicTest()
+    {
+        dynamic test = new ExpandoObject();
+        test.Id = 1;
+        test.Name = "Test";
+        test.Description = "Test";
     }
 }
