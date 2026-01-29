@@ -1,8 +1,8 @@
 using System.IO.Pipelines;
 using Umi.Rpc.Base;
 using Umi.Rpc.Protocol;
-using Umi.Rpc.Server.Services;
 using Umi.Rpc.Server.Client;
+using Umi.Rpc.Server.Services;
 
 namespace Umi.Rpc.Server.Executors;
 
@@ -13,7 +13,7 @@ public sealed class AuthenticationExecutor(IAuthenticationService service) : ISe
         // 这里应该要有一个 Payload ，如果没有，就是错误包，应该返回通用错误并保持原样
         if (basic.Length <= 0)
         {
-            return new ExecuteResult()
+            return new ExecuteResult
             {
                 CloseConnection = false,
                 ResultCommand = UmiRpcConstants.AUTHENTICATION_RESULT,
@@ -26,7 +26,7 @@ public sealed class AuthenticationExecutor(IAuthenticationService service) : ISe
         var result = await reader.ReadAtLeastAsync(basic.Length);
         if (result.IsCanceled || result.IsCompleted)
         {
-            return new ExecuteResult()
+            return new ExecuteResult
             {
                 ResultCommand = UmiRpcConstants.COMMON_ERROR,
                 CloseConnection = true,

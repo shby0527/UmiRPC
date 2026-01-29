@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -121,34 +122,44 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
         }
     }
 
-    public static RpcMetadataConsent CreateFromMessage(uint serialization,
-        scoped in ReadOnlySpan<RpcMetadataService> metadataService,
-        string[] names)
+    public static RpcMetadataConsent CreateFromMessage(uint serialization, RpcMetadataWrap[] metadata)
     {
-        if (names.Length < metadataService.Length)
+        if (metadata.Length <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(names));
+            throw new ArgumentOutOfRangeException(nameof(metadata));
         }
 
-        var nameData = names.Select(p => Encoding.ASCII.GetBytes(p)).ToArray();
+        var nameData = metadata
+            .Select(p => p.ServiceName)
+            .Distinct()
+            .ToImmutableDictionary(p => p,
+                p => Encoding.ASCII.GetBytes(p));
         // ?? 长度？ 12 + metadata.Length * sizeof(RpcMetadataService) + sum(nameData)
-        var stringPoolLen = nameData.Sum(p => p.Length);
-        var totalLength = 12 + metadataService.Length * sizeof(RpcMetadataService) + stringPoolLen;
+        var stringPoolLen = nameData.Sum(p => p.Value.Length);
+        var totalLength = 12 + metadata.Length * sizeof(RpcMetadataService) + stringPoolLen;
         var buffer = (byte*)NativeMemory.Alloc((UIntPtr)totalLength);
         *(uint*)buffer = serialization;
-        *(int*)(buffer + 4) = metadataService.Length;
+        *(int*)(buffer + 4) = metadata.Length;
         *(int*)(buffer + 8) = stringPoolLen;
         var offset = 0;
-        var stringPool = buffer + 12 + metadataService.Length * sizeof(RpcMetadataService);
-        // 还要修改一下内存
-        for (var i = 0; i < metadataService.Length; i++)
+        var stringPool = buffer + 12 + metadata.Length * sizeof(RpcMetadataService);
+        Dictionary<string, (int Offset, int Length)> dic = new();
+        // 先存储字符串池
+        foreach (var item in nameData)
         {
-            *(int*)(buffer + 12 + i * sizeof(RpcMetadataService)) = metadataService[i].Version;
-            *(int*)(buffer + 12 + i * sizeof(RpcMetadataService) + 4) = nameData[i].Length;
-            *(int*)(buffer + 12 + i * sizeof(RpcMetadataService) + 8) = offset;
-            ReadOnlySpan<byte> source = nameData[i];
-            source.CopyTo(new Span<byte>(stringPool + offset, nameData[i].Length));
-            offset += nameData[i].Length;
+            ReadOnlySpan<byte> source = item.Value;
+            source.CopyTo(new Span<byte>(stringPool + offset, item.Value.Length));
+            dic.Add(item.Key, (offset, item.Value.Length));
+            offset += item.Value.Length;
+        }
+
+        // 还要修改一下内存
+        for (var i = 0; i < metadata.Length; i++)
+        {
+            var ol = dic[metadata[i].ServiceName];
+            *(int*)(buffer + 12 + i * sizeof(RpcMetadataService)) = metadata[i].Version;
+            *(int*)(buffer + 12 + i * sizeof(RpcMetadataService) + 4) = ol.Length;
+            *(int*)(buffer + 12 + i * sizeof(RpcMetadataService) + 8) = ol.Offset;
         }
 
         return new RpcMetadataConsent(buffer, totalLength);
@@ -173,3 +184,5 @@ public readonly struct RpcMetadataService(int version)
     /// </summary>
     public readonly int NameOffset;
 }
+
+public readonly record struct RpcMetadataWrap(int Version, string ServiceName);

@@ -81,15 +81,16 @@ public class DataPackageTest
     [Test]
     public void MetadataConsentTest()
     {
-        string[] names = ["ServiceA", "ServiceB-Test", "ProxyServiceC", "AbcTarget-ServiceD"];
-        RpcMetadataService[] versions =
-        [
-            new(0x1),
-            new(0x1),
-            new(0x1),
-            new(0x1),
-        ];
-        using var consent = RpcMetadataConsent.CreateFromMessage(0x5, versions, names);
+        var services = new RpcMetadataWrap[]
+        {
+            new(0x1, "Service-A"),
+            new(0x1, "Service-B"),
+            new(0x1, "Service-C"),
+            new(0x1, "Service-D"),
+            new(0x2, "Service-A"),
+            new(0x3, "Service-A"),
+        };
+        using var consent = RpcMetadataConsent.CreateFromMessage(0x5, services);
         using var reload = RpcMetadataConsent.CreateFromMemory(consent.Memory);
         using (Assert.EnterMultipleScope())
         {
@@ -97,15 +98,20 @@ public class DataPackageTest
             Assert.That(reload.ServiceArrayLength, Is.EqualTo(consent.ServiceArrayLength));
             Assert.That(reload.StringPoolLength, Is.EqualTo(consent.StringPoolLength));
             Assert.That(reload.RpcMetadataServices.Length, Is.EqualTo(consent.RpcMetadataServices.Length));
-
+            Assert.That(consent.ServiceArrayLength, Is.EqualTo(services.Length));
             for (var i = 0; i < consent.RpcMetadataServices.Length; i++)
             {
                 Assert.That(reload.RpcMetadataServices[i], Is.EqualTo(consent.RpcMetadataServices[i]));
+                Assert.That(consent.RpcMetadataServices[i].Version, Is.EqualTo(services[i].Version));
                 Assert.That(
                     reload.GetString(reload.RpcMetadataServices[i].NameOffset,
                         reload.RpcMetadataServices[i].NameLength),
                     Is.EqualTo(consent.GetString(consent.RpcMetadataServices[i].NameOffset,
                         consent.RpcMetadataServices[i].NameLength)));
+                Assert.That(
+                    consent.GetString(consent.RpcMetadataServices[i].NameOffset,
+                        consent.RpcMetadataServices[i].NameLength),
+                    Is.EqualTo(services[i].ServiceName));
             }
         }
     }
