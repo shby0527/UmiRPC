@@ -41,10 +41,7 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
         }
     }
 
-    /// <summary>
-    /// 那个字符串池的直接大小
-    /// </summary>
-    public int StringPoolLength
+    public int TypeMappingLength
     {
         get
         {
@@ -54,15 +51,33 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
     }
 
     /// <summary>
+    /// 那个字符串池的直接大小
+    /// </summary>
+    public int StringPoolLength
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return *(int*)((byte*)Data + 12);
+        }
+    }
+
+    /// <summary>
     /// 这是那个数组
     /// </summary>
-    public ReadOnlySpan<RpcMetadataService> RpcMetadataServices => new((byte*)Data + 12, ServiceArrayLength);
+    public ReadOnlySpan<RpcMetadataService> RpcMetadataServices => new((byte*)Data + 16, ServiceArrayLength);
+
+
+    public ReadOnlySpan<RpcMetadataTypeMapping> RpcMetadataTypeMappings =>
+        new((byte*)Data + 16 + sizeof(RpcMetadataService) * ServiceArrayLength, TypeMappingLength);
 
     /// <summary>
     /// 字符串池
     /// </summary>
     public ReadOnlySpan<byte> StringPool =>
-        new((byte*)Data + 12 + ServiceArrayLength * sizeof(RpcMetadataService), StringPoolLength);
+        new(
+            (byte*)Data + 16 + ServiceArrayLength * sizeof(RpcMetadataService) +
+            sizeof(RpcMetadataTypeMapping) * TypeMappingLength, StringPoolLength);
 
 
     public string GetString(int offset, int length)
@@ -73,21 +88,23 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
             throw new ArgumentOutOfRangeException(nameof(offset));
         }
 
-        var pool = (byte*)Data + 12 + ServiceArrayLength * sizeof(RpcMetadataService);
+        var pool = (byte*)Data + 16 + ServiceArrayLength * sizeof(RpcMetadataService) +
+                   sizeof(RpcMetadataTypeMapping) * TypeMappingLength;
         return Encoding.ASCII.GetString(pool + offset, length);
     }
 
 
     public static RpcMetadataConsent CreateFromMemory(scoped in ReadOnlySpan<byte> data)
     {
-        if (data.Length < 12)
+        if (data.Length < 16)
         {
             throw new ArgumentOutOfRangeException(nameof(data));
         }
 
         fixed (byte* ptr = data)
         {
-            var totalLength = *(int*)(ptr + 4) * sizeof(RpcMetadataService) + *(int*)(ptr + 8) + 12;
+            var totalLength = 16 + *(int*)(ptr + 4) * sizeof(RpcMetadataService) +
+                              *(int*)(ptr + 8) * sizeof(RpcMetadataTypeMapping) + *(int*)(ptr + 12);
             if (data.Length < totalLength)
             {
                 throw new ArgumentOutOfRangeException(nameof(data));
@@ -101,16 +118,17 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
 
     public static RpcMetadataConsent CreateFromMemory(scoped in ReadOnlySequence<byte> data)
     {
-        if (data.Length < 12)
+        if (data.Length < 16)
         {
             throw new ArgumentOutOfRangeException(nameof(data));
         }
 
-        Span<byte> header = stackalloc byte[12];
-        data.Slice(0, 12).CopyTo(header);
+        Span<byte> header = stackalloc byte[16];
+        data.Slice(0, 16).CopyTo(header);
         fixed (byte* ptr = header)
         {
-            var totalLength = *(int*)(ptr + 4) * sizeof(RpcMetadataService) + *(int*)(ptr + 8) + 12;
+            var totalLength = 16 + *(int*)(ptr + 4) * sizeof(RpcMetadataService) +
+                              *(int*)(ptr + 8) * sizeof(RpcMetadataTypeMapping) + *(int*)(ptr + 12);
             if (data.Length < totalLength)
             {
                 throw new ArgumentOutOfRangeException(nameof(data));
@@ -122,27 +140,38 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
         }
     }
 
-    public static RpcMetadataConsent CreateFromMessage(uint serialization, RpcMetadataWrap[] metadata)
+    public static RpcMetadataConsent CreateFromMessage(uint serialization, RpcMetadataWrap[] metadata,
+        RpcMetadataTypeMappingWrap[] typeMappings)
     {
-        if (metadata.Length <= 0)
+        if (metadata is null || metadata.Length <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(metadata));
+        }
+
+        if (typeMappings is null)
         {
             throw new ArgumentOutOfRangeException(nameof(metadata));
         }
 
         var nameData = metadata
             .Select(p => p.ServiceName)
+            .Concat(typeMappings.Select(p => p.Source))
+            .Concat(typeMappings.Select(p => p.Target))
             .Distinct()
             .ToImmutableDictionary(p => p,
                 p => Encoding.ASCII.GetBytes(p));
         // ?? 长度？ 12 + metadata.Length * sizeof(RpcMetadataService) + sum(nameData)
         var stringPoolLen = nameData.Sum(p => p.Value.Length);
-        var totalLength = 12 + metadata.Length * sizeof(RpcMetadataService) + stringPoolLen;
+        var totalLength = 16 + metadata.Length * sizeof(RpcMetadataService) +
+                          typeMappings.Length * sizeof(RpcMetadataTypeMapping) + stringPoolLen;
         var buffer = (byte*)NativeMemory.Alloc((UIntPtr)totalLength);
         *(uint*)buffer = serialization;
         *(int*)(buffer + 4) = metadata.Length;
-        *(int*)(buffer + 8) = stringPoolLen;
+        *(int*)(buffer + 8) = typeMappings.Length;
+        *(int*)(buffer + 12) = stringPoolLen;
         var offset = 0;
-        var stringPool = buffer + 12 + metadata.Length * sizeof(RpcMetadataService);
+        var stringPool = buffer + 16 + metadata.Length * sizeof(RpcMetadataService) +
+                         typeMappings.Length * sizeof(RpcMetadataTypeMapping);
         Dictionary<string, (int Offset, int Length)> dic = new();
         // 先存储字符串池
         foreach (var item in nameData)
@@ -157,32 +186,83 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
         for (var i = 0; i < metadata.Length; i++)
         {
             var ol = dic[metadata[i].ServiceName];
-            *(int*)(buffer + 12 + i * sizeof(RpcMetadataService)) = metadata[i].Version;
-            *(int*)(buffer + 12 + i * sizeof(RpcMetadataService) + 4) = ol.Length;
-            *(int*)(buffer + 12 + i * sizeof(RpcMetadataService) + 8) = ol.Offset;
+            *(int*)(buffer + 16 + i * sizeof(RpcMetadataService)) = metadata[i].Version;
+            *(int*)(buffer + 16 + i * sizeof(RpcMetadataService) + 4) = ol.Length;
+            *(int*)(buffer + 16 + i * sizeof(RpcMetadataService) + 8) = ol.Offset;
+            *(long*)(buffer + 16 + i * sizeof(RpcMetadataService) + 12) = metadata[i].TransportType;
+        }
+
+        var beginOfTypeMapping = buffer + 16 + metadata.Length * sizeof(RpcMetadataService);
+        for (var i = 0; i < typeMappings.Length; i++)
+        {
+            var sourceOl = dic[typeMappings[i].Source];
+            var targetOl = dic[typeMappings[i].Target];
+            *(int*)(beginOfTypeMapping + i * sizeof(RpcMetadataTypeMapping)) = sourceOl.Offset;
+            *(int*)(beginOfTypeMapping + i * sizeof(RpcMetadataTypeMapping) + 4) = sourceOl.Length;
+            *(int*)(beginOfTypeMapping + i * sizeof(RpcMetadataTypeMapping) + 8) = targetOl.Offset;
+            *(int*)(beginOfTypeMapping + i * sizeof(RpcMetadataTypeMapping) + 12) = targetOl.Length;
         }
 
         return new RpcMetadataConsent(buffer, totalLength);
     }
 }
 
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-public readonly struct RpcMetadataService(int version)
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
+public readonly struct RpcMetadataTypeMapping
+{
+    [FieldOffset(0)] public readonly long SourceType;
+    [FieldOffset(8)] public readonly long TargetType;
+
+
+    [FieldOffset(0)] public readonly int SourceTypeOffset;
+    [FieldOffset(4)] public readonly int SourceTypeLength;
+
+
+    [FieldOffset(8)] public readonly int TargetTypeOffset;
+    [FieldOffset(12)] public readonly int TargetTypeLength;
+}
+
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
+public readonly struct RpcMetadataService
 {
     /// <summary>
     /// 服务版本
     /// </summary>
-    public readonly int Version = version;
+    [FieldOffset(0)] public readonly int Version;
 
     /// <summary>
     /// 服务名长度
     /// </summary>
-    public readonly int NameLength;
+    [FieldOffset(4)] public readonly int NameLength;
 
     /// <summary>
     /// 服务在字符串池中的相对offset
     /// </summary>
-    public readonly int NameOffset;
+    [FieldOffset(8)] public readonly int NameOffset;
+
+    /// <summary>
+    ///  传输类型， 8 bytes, 8 个小组合
+    /// </summary>
+    [FieldOffset(12)] public readonly long TransportType;
+
+    /// <summary>
+    /// 压缩类型
+    /// </summary>
+    [FieldOffset(12)] public readonly byte CompressionType;
+
+    /// <summary>
+    /// 超时时间 0 是永远等待不超时，后续是秒数
+    /// </summary>
+    [FieldOffset(13)] public readonly byte Timeout;
+
+    [FieldOffset(14)] public readonly byte Reserve1;
+    [FieldOffset(15)] public readonly byte Reserve2;
+    [FieldOffset(16)] public readonly byte Reserve3;
+    [FieldOffset(17)] public readonly byte Reserve4;
+    [FieldOffset(18)] public readonly byte Reserve5;
+    [FieldOffset(19)] public readonly byte Reserve6;
 }
 
-public readonly record struct RpcMetadataWrap(int Version, string ServiceName);
+public readonly record struct RpcMetadataWrap(int Version, string ServiceName, long TransportType);
+
+public readonly record struct RpcMetadataTypeMappingWrap(string Source, string Target);
