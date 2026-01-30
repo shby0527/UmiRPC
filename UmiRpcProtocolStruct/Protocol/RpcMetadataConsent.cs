@@ -17,6 +17,30 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
     {
     }
 
+    /*********************************************************
+     * 这里详细说明一下包结构
+     * Serialization:        unsigned int,  4             bytes  约定双方的序列化类型(Msgpack? protobuf? JSON?)
+     * PackageLength:        int,           4             bytes  整个数据包的总长度（含固定头）
+     * StringPoolOffset:     int,           4             bytes  字符串池偏移（相对包头
+     * ContentHeaderCount:   short          2             bytes  内容数据数组长度
+     * Content Array         Content        9*count       bytes  内容数组
+     * -   Flag              byte           1             byte   内容数组标识
+     * -   Offset            int            4             bytes  内容数组指向的内容数据偏移
+     * -   Count             int            4             bytes  内容数据长度/数量
+     * Service Array         Service        8*count       bytes  服务数组
+     * -   Offset            int            4             bytes  服务数组服务名字符串相对String Pool 偏移
+     * -   Length            int            4             bytes  服务数组服务名字符串字节长度
+     * TypeMapping Array     TypeMapping    16*count      bytes  类型映射数组
+     * -   Source Type       long           8             bytes  源类型（Offset, Length)组合， 字符串池
+     * -   Target Type       long           8             bytes  目标类型（Offset, Length)组合， 字符串池
+     * EventHandle Array     EventHandle    48*count      bytes  事件句柄数组
+     * -   Type UUID         GUID           16            bytes  类型 UUID
+     * -   Object UUID       GUID           16            bytes  对象 UUID
+     * -   Type Name         long           8             bytes  对象类型名（Offset, Length) 组合， 字符串池
+     * -   Event Name        long           8             bytes  事件名（Offset，Length）组合，字符串池
+     * String Pool           String Pool    variable      bytes  字符串池
+     ********************************************************/
+
     /// <summary>
     /// 序列化协议
     /// </summary>
@@ -30,9 +54,9 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
     }
 
     /// <summary>
-    /// 这是数组长度
+    /// 包长度
     /// </summary>
-    public int ServiceArrayLength
+    public int PackageLength
     {
         get
         {
@@ -41,7 +65,10 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
         }
     }
 
-    public int TypeMappingLength
+    /// <summary>
+    /// 字符串池的偏移
+    /// </summary>
+    public int StringPoolOffset
     {
         get
         {
@@ -51,60 +78,65 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
     }
 
     /// <summary>
-    /// 那个字符串池的直接大小
+    /// 内容数组数量
     /// </summary>
-    public int StringPoolLength
+    public short ContentHeaderCount
     {
         get
         {
             ThrowIfDisposed();
-            return *(int*)((byte*)Data + 12);
+            return *(short*)((byte*)Data + 12);
         }
     }
 
     /// <summary>
-    /// 这是那个数组
+    /// 内容数组头部
     /// </summary>
-    public ReadOnlySpan<RpcMetadataService> RpcMetadataServices => new((byte*)Data + 16, ServiceArrayLength);
-
-
-    public ReadOnlySpan<RpcMetadataTypeMapping> RpcMetadataTypeMappings =>
-        new((byte*)Data + 16 + sizeof(RpcMetadataService) * ServiceArrayLength, TypeMappingLength);
+    public ReadOnlySpan<RpcMetadataContent> ContentHeaders => new((byte*)Data + 14, ContentHeaderCount);
 
     /// <summary>
-    /// 字符串池
+    /// 获取内容头的结构
     /// </summary>
-    public ReadOnlySpan<byte> StringPool =>
-        new(
-            (byte*)Data + 16 + ServiceArrayLength * sizeof(RpcMetadataService) +
-            sizeof(RpcMetadataTypeMapping) * TypeMappingLength, StringPoolLength);
-
-
-    public string GetString(int offset, int length)
+    /// <param name="offset">头偏移</param>
+    /// <param name="count">数量</param>
+    /// <typeparam name="T">内容头结构</typeparam>
+    /// <returns>返回内容头结构</returns>
+    /// <exception cref="ArgumentOutOfRangeException">offset 超范围</exception>
+    public ReadOnlySpan<T> GetContentHeader<T>(int offset, int count) where T : unmanaged
     {
         ThrowIfDisposed();
-        if (offset > StringPoolLength || offset + length > StringPoolLength)
+        // 保证内容在包长度内
+        if (offset + 14 > PackageLength || offset + count * sizeof(T) + 14 > PackageLength)
         {
             throw new ArgumentOutOfRangeException(nameof(offset));
         }
 
-        var pool = (byte*)Data + 16 + ServiceArrayLength * sizeof(RpcMetadataService) +
-                   sizeof(RpcMetadataTypeMapping) * TypeMappingLength;
+        return new ReadOnlySpan<T>((byte*)Data + offset, count);
+    }
+
+    public string GetString(int offset, int length)
+    {
+        ThrowIfDisposed();
+        if (offset + 14 > PackageLength || offset + length + 14 > PackageLength)
+        {
+            throw new ArgumentOutOfRangeException(nameof(offset));
+        }
+
+        var pool = (byte*)Data + StringPoolOffset;
         return Encoding.ASCII.GetString(pool + offset, length);
     }
 
 
     public static RpcMetadataConsent CreateFromMemory(scoped in ReadOnlySpan<byte> data)
     {
-        if (data.Length < 16)
+        if (data.Length < 14)
         {
             throw new ArgumentOutOfRangeException(nameof(data));
         }
 
         fixed (byte* ptr = data)
         {
-            var totalLength = 16 + *(int*)(ptr + 4) * sizeof(RpcMetadataService) +
-                              *(int*)(ptr + 8) * sizeof(RpcMetadataTypeMapping) + *(int*)(ptr + 12);
+            var totalLength = *(int*)(ptr + 4);
             if (data.Length < totalLength)
             {
                 throw new ArgumentOutOfRangeException(nameof(data));
@@ -118,17 +150,16 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
 
     public static RpcMetadataConsent CreateFromMemory(scoped in ReadOnlySequence<byte> data)
     {
-        if (data.Length < 16)
+        if (data.Length < 14)
         {
             throw new ArgumentOutOfRangeException(nameof(data));
         }
 
-        Span<byte> header = stackalloc byte[16];
-        data.Slice(0, 16).CopyTo(header);
+        Span<byte> header = stackalloc byte[14];
+        data.Slice(0, 14).CopyTo(header);
         fixed (byte* ptr = header)
         {
-            var totalLength = 16 + *(int*)(ptr + 4) * sizeof(RpcMetadataService) +
-                              *(int*)(ptr + 8) * sizeof(RpcMetadataTypeMapping) + *(int*)(ptr + 12);
+            var totalLength = *(int*)(ptr + 4);
             if (data.Length < totalLength)
             {
                 throw new ArgumentOutOfRangeException(nameof(data));
@@ -140,87 +171,144 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
         }
     }
 
-    public static RpcMetadataConsent CreateFromMessage(uint serialization, RpcMetadataWrap[] metadata,
-        RpcMetadataTypeMappingWrap[] typeMappings)
+    public static RpcMetadataConsent CreateFromMessage(uint serialization, RpcMetadataContentWrap content)
     {
-        if (metadata is null || metadata.Length <= 0)
+        if (content.Service is null
+            || content.Service.Length <= 0
+            || content.TypeMapping is null
+            || content.TypeMapping.Length <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(metadata));
+            throw new ArgumentOutOfRangeException(nameof(content));
         }
 
-        if (typeMappings is null)
-        {
-            throw new ArgumentOutOfRangeException(nameof(metadata));
-        }
-
-        var nameData = metadata
+        short contentHeaderCount = 2;
+        var nameDataStr = content.Service
             .Select(p => p.ServiceName)
-            .Concat(typeMappings.Select(p => p.Source))
-            .Concat(typeMappings.Select(p => p.Target))
-            .Distinct()
+            .Concat(content.TypeMapping.Select(p => p.Source))
+            .Concat(content.TypeMapping.Select(p => p.Target));
+        var eventContentCount = 0;
+        if (content.Event is { Length: > 0 })
+        {
+            nameDataStr = nameDataStr.Concat(content.Event.Select(p => p.TypeName))
+                .Concat(content.Event.Select(p => p.EventName));
+            contentHeaderCount++;
+            eventContentCount = content.Event.Length;
+        }
+
+        var nameData = nameDataStr.Distinct()
             .ToImmutableDictionary(p => p,
                 p => Encoding.ASCII.GetBytes(p));
-        // ?? 长度？ 12 + metadata.Length * sizeof(RpcMetadataService) + sum(nameData)
+
         var stringPoolLen = nameData.Sum(p => p.Value.Length);
-        var totalLength = 16 + metadata.Length * sizeof(RpcMetadataService) +
-                          typeMappings.Length * sizeof(RpcMetadataTypeMapping) + stringPoolLen;
-        var buffer = (byte*)NativeMemory.Alloc((UIntPtr)totalLength);
+        var packageLength = 14 + contentHeaderCount * sizeof(RpcMetadataContent)
+                               + content.Service.Length * sizeof(RpcMetadataService)
+                               + content.TypeMapping.Length * sizeof(RpcMetadataTypeMapping)
+                               + eventContentCount * sizeof(RpcMetadataEventHandle)
+                               + stringPoolLen;
+        var buffer = (byte*)NativeMemory.Alloc((UIntPtr)packageLength);
+        var stringPoolOffset = packageLength - stringPoolLen;
         *(uint*)buffer = serialization;
-        *(int*)(buffer + 4) = metadata.Length;
-        *(int*)(buffer + 8) = typeMappings.Length;
-        *(int*)(buffer + 12) = stringPoolLen;
-        var offset = 0;
-        var stringPool = buffer + 16 + metadata.Length * sizeof(RpcMetadataService) +
-                         typeMappings.Length * sizeof(RpcMetadataTypeMapping);
+        *(int*)(buffer + 4) = packageLength;
+        *(int*)(buffer + 8) = stringPoolOffset; // string pool offset 
+        *(short*)(buffer + 12) = contentHeaderCount;
+        // 先写入字符串池
+        var stringPool = buffer + stringPoolOffset;
         Dictionary<string, (int Offset, int Length)> dic = new();
-        // 先存储字符串池
+        var poolStrOffset = 0;
         foreach (var item in nameData)
         {
-            ReadOnlySpan<byte> source = item.Value;
-            source.CopyTo(new Span<byte>(stringPool + offset, item.Value.Length));
-            dic.Add(item.Key, (offset, item.Value.Length));
-            offset += item.Value.Length;
+            ReadOnlySpan<byte> data = item.Value;
+            var target = new Span<byte>(stringPool + poolStrOffset, item.Value.Length);
+            data.CopyTo(target);
+            dic.Add(item.Key, (poolStrOffset, item.Value.Length));
+            poolStrOffset += item.Value.Length;
         }
 
-        var beginOfService = buffer + 16;
-        // 还要修改一下内存
-        for (var i = 0; i < metadata.Length; i++)
+        // 这是 service 的写入
+        var serviceOffset = 14 + contentHeaderCount * sizeof(RpcMetadataContent);
+        MetadataContentHeaderWrite(buffer + 14, RpcMetadataContent.FLAG_SERVICE, serviceOffset, content.Service.Length);
+        var serviceArray = buffer + serviceOffset;
+        for (var i = 0; i < content.Service.Length; i++)
         {
-            var ol = dic[metadata[i].ServiceName];
-            *(int*)(beginOfService + i * sizeof(RpcMetadataService)) = metadata[i].Version;
-            *(int*)(beginOfService + i * sizeof(RpcMetadataService) + 4) = ol.Length;
-            *(int*)(beginOfService + i * sizeof(RpcMetadataService) + 8) = ol.Offset;
-            *(long*)(beginOfService + i * sizeof(RpcMetadataService) + 12) = metadata[i].TransportType;
+            *(int*)(serviceArray + i * sizeof(RpcMetadataService)) = content.Service[i].Version;
+            var (offset, length) = dic[content.Service[i].ServiceName];
+            *(int*)(serviceArray + i * sizeof(RpcMetadataService) + 4) = offset;
+            *(int*)(serviceArray + i * sizeof(RpcMetadataService) + 8) = length;
+            *(long*)(serviceArray + i * sizeof(RpcMetadataService) + 12) = content.Service[i].TransportType;
         }
 
-        var beginOfTypeMapping = beginOfService + metadata.Length * sizeof(RpcMetadataService);
-        for (var i = 0; i < typeMappings.Length; i++)
+        // 这是 typeMapping 的写入
+        var typeMappingOffset = serviceOffset + content.Service.Length * sizeof(RpcMetadataService);
+        MetadataContentHeaderWrite(buffer + 14 + sizeof(RpcMetadataContent),
+            RpcMetadataContent.FLAG_TYPE_MAPPING,
+            typeMappingOffset,
+            content.TypeMapping.Length);
+        var typeMappingArray = buffer + typeMappingOffset;
+        for (var i = 0; i < content.TypeMapping.Length; i++)
         {
-            var sourceOl = dic[typeMappings[i].Source];
-            var targetOl = dic[typeMappings[i].Target];
-            *(int*)(beginOfTypeMapping + i * sizeof(RpcMetadataTypeMapping)) = sourceOl.Offset;
-            *(int*)(beginOfTypeMapping + i * sizeof(RpcMetadataTypeMapping) + 4) = sourceOl.Length;
-            *(int*)(beginOfTypeMapping + i * sizeof(RpcMetadataTypeMapping) + 8) = targetOl.Offset;
-            *(int*)(beginOfTypeMapping + i * sizeof(RpcMetadataTypeMapping) + 12) = targetOl.Length;
+            var (offset, length) = dic[content.TypeMapping[i].Source];
+            *(int*)(typeMappingArray + i * sizeof(RpcMetadataTypeMapping)) = offset;
+            *(int*)(typeMappingArray + i * sizeof(RpcMetadataTypeMapping) + 4) = length;
+            var (targetOffset, targetLength) = dic[content.TypeMapping[i].Target];
+            *(int*)(typeMappingArray + i * sizeof(RpcMetadataTypeMapping) + 8) = targetOffset;
+            *(int*)(typeMappingArray + i * sizeof(RpcMetadataTypeMapping) + 12) = targetLength;
         }
 
-        return new RpcMetadataConsent(buffer, totalLength);
+        // event handle 的写入
+        if (content.Event is not { Length: > 0 }) return new RpcMetadataConsent(buffer, packageLength);
+        var eventHandleOffset = typeMappingOffset + content.TypeMapping.Length * sizeof(RpcMetadataTypeMapping);
+        MetadataContentHeaderWrite(buffer + 14 + 2 * sizeof(RpcMetadataContent),
+            RpcMetadataContent.FLAG_EVENT_HANDLE,
+            eventHandleOffset,
+            content.Event.Length);
+        var eventHandleArray = buffer + eventHandleOffset;
+        for (var i = 0; i < content.Event.Length; i++)
+        {
+            Span<byte> typeGuid = new(eventHandleArray + i * sizeof(RpcMetadataEventHandle), 16);
+            content.Event[i].TypeGuid.TryWriteBytes(typeGuid);
+            Span<byte> objectGuid = new(eventHandleArray + i * sizeof(RpcMetadataEventHandle) + 16, 16);
+            content.Event[i].ObjectGuid.TryWriteBytes(objectGuid);
+            var (toffset, tlength) = dic[content.Event[i].TypeName];
+            *(int*)(eventHandleArray + i * sizeof(RpcMetadataEventHandle) + 32) = toffset;
+            *(int*)(eventHandleArray + i * sizeof(RpcMetadataEventHandle) + 36) = tlength;
+
+            var (eoffset, elength) = dic[content.Event[i].EventName];
+            *(int*)(eventHandleArray + i * sizeof(RpcMetadataEventHandle) + 40) = eoffset;
+            *(int*)(eventHandleArray + i * sizeof(RpcMetadataEventHandle) + 44) = elength;
+        }
+
+        return new RpcMetadataConsent(buffer, packageLength);
+    }
+
+    private static void MetadataContentHeaderWrite(byte* address, byte flag, int offset, int count)
+    {
+        *address = flag;
+        *(int*)(address + 1) = offset;
+        *(int*)(address + 5) = count;
     }
 }
 
 [StructLayout(LayoutKind.Explicit, Pack = 1)]
-public readonly struct RpcMetadataTypeMapping
+public readonly struct RpcMetadataContent
 {
-    [FieldOffset(0)] public readonly long SourceType;
-    [FieldOffset(8)] public readonly long TargetType;
+    // ReSharper disable InconsistentNaming
+    public const byte FLAG_SERVICE = 0x1;
+    public const byte FLAG_TYPE_MAPPING = 0x2;
+    public const byte FLAG_EVENT_HANDLE = 0x4;
+    // ReSharper restore InconsistentNaming
 
+    /// <summary>
+    /// Metadata 标志 (见本类定义）
+    /// </summary>
+    [FieldOffset(0)] public readonly byte Flag;
 
-    [FieldOffset(0)] public readonly int SourceTypeOffset;
-    [FieldOffset(4)] public readonly int SourceTypeLength;
+    /// <summary>
+    /// 内容数组指向
+    /// </summary>
+    [FieldOffset(1)] public readonly long ContentArray;
 
-
-    [FieldOffset(8)] public readonly int TargetTypeOffset;
-    [FieldOffset(12)] public readonly int TargetTypeLength;
+    [FieldOffset(1)] public readonly int Offset;
+    [FieldOffset(5)] public readonly int Count;
 }
 
 [StructLayout(LayoutKind.Explicit, Pack = 1)]
@@ -232,14 +320,14 @@ public readonly struct RpcMetadataService
     [FieldOffset(0)] public readonly int Version;
 
     /// <summary>
-    /// 服务名长度
-    /// </summary>
-    [FieldOffset(4)] public readonly int NameLength;
-
-    /// <summary>
     /// 服务在字符串池中的相对offset
     /// </summary>
-    [FieldOffset(8)] public readonly int NameOffset;
+    [FieldOffset(4)] public readonly int NameOffset;
+
+    /// <summary>
+    /// 服务名长度
+    /// </summary>
+    [FieldOffset(8)] public readonly int NameLength;
 
     /// <summary>
     ///  传输类型， 8 bytes, 8 个小组合
@@ -268,6 +356,68 @@ public readonly struct RpcMetadataService
     [FieldOffset(19)] public readonly byte Reserve6;
 }
 
-public readonly record struct RpcMetadataWrap(int Version, string ServiceName, long TransportType);
+[StructLayout(LayoutKind.Explicit, Pack = 1)]
+public readonly struct RpcMetadataTypeMapping
+{
+    [FieldOffset(0)] public readonly long SourceType;
+    [FieldOffset(8)] public readonly long TargetType;
+
+
+    [FieldOffset(0)] public readonly int SourceTypeOffset;
+    [FieldOffset(4)] public readonly int SourceTypeLength;
+
+
+    [FieldOffset(8)] public readonly int TargetTypeOffset;
+    [FieldOffset(12)] public readonly int TargetTypeLength;
+}
+
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 48)]
+public readonly unsafe struct RpcMetadataEventHandle
+{
+    [FieldOffset(0)] public readonly byte TypeGUID;
+
+    public Guid TypeGuid
+    {
+        get
+        {
+            fixed (byte* ptr = &TypeGUID)
+            {
+                ReadOnlySpan<byte> span = new(ptr, 16);
+                return new Guid(span);
+            }
+        }
+    }
+
+    [FieldOffset(16)] public readonly byte ObjectGUID;
+
+    public Guid ObjectGuid
+    {
+        get
+        {
+            fixed (byte* ptr = &ObjectGUID)
+            {
+                ReadOnlySpan<byte> span = new(ptr, 16);
+                return new Guid(span);
+            }
+        }
+    }
+
+    [FieldOffset(32)] public readonly long TypeName;
+    [FieldOffset(32)] public readonly int TypeNameOffset;
+    [FieldOffset(36)] public readonly int TypeNameLength;
+
+    [FieldOffset(40)] public readonly long EventName;
+    [FieldOffset(40)] public readonly int EventNameOffset;
+    [FieldOffset(44)] public readonly int EventNameLength;
+}
+
+public readonly record struct RpcMetadataServiceWrap(int Version, string ServiceName, long TransportType);
 
 public readonly record struct RpcMetadataTypeMappingWrap(string Source, string Target);
+
+public readonly record struct RpcMetadataEventWrap(Guid TypeGuid, Guid ObjectGuid, string TypeName, string EventName);
+
+public readonly record struct RpcMetadataContentWrap(
+    RpcMetadataServiceWrap[] Service,
+    RpcMetadataTypeMappingWrap[] TypeMapping,
+    RpcMetadataEventWrap[]? Event);

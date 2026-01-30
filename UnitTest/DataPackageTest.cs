@@ -82,7 +82,7 @@ public class DataPackageTest
     [Test]
     public void MetadataConsentTest()
     {
-        var services = new RpcMetadataWrap[]
+        var services = new RpcMetadataServiceWrap[]
         {
             new(0x1, "Service-A", 0x0101),
             new(0x1, "Service-B", 0x0101),
@@ -96,55 +96,80 @@ public class DataPackageTest
             new("System.String", "string"),
             new("System.Int16", "short"),
         };
-        using var consent = RpcMetadataConsent.CreateFromMessage(0x5, services, typeMapping);
+        var eventHandles = new RpcMetadataEventWrap[]
+        {
+            new(Guid.NewGuid(), Guid.NewGuid(), "string", "Update")
+        };
+        using var consent =
+            RpcMetadataConsent.CreateFromMessage(0x5, new RpcMetadataContentWrap(services, typeMapping, eventHandles));
         using var reload = RpcMetadataConsent.CreateFromMemory(consent.Memory);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(reload.Serialization, Is.EqualTo(consent.Serialization));
-            Assert.That(reload.ServiceArrayLength, Is.EqualTo(consent.ServiceArrayLength));
-            Assert.That(reload.TypeMappingLength, Is.EqualTo(consent.TypeMappingLength));
-            Assert.That(reload.StringPoolLength, Is.EqualTo(consent.StringPoolLength));
-            Assert.That(reload.RpcMetadataServices.Length, Is.EqualTo(consent.RpcMetadataServices.Length));
-            Assert.That(consent.ServiceArrayLength, Is.EqualTo(services.Length));
-            Assert.That(consent.TypeMappingLength, Is.EqualTo(typeMapping.Length));
-            for (var i = 0; i < consent.RpcMetadataServices.Length; i++)
+            Assert.That(reload.PackageLength, Is.EqualTo(consent.PackageLength));
+            Assert.That(reload.ContentHeaderCount, Is.EqualTo(consent.ContentHeaderCount));
+            Assert.That(reload.StringPoolOffset, Is.EqualTo(consent.StringPoolOffset));
+            Assert.That(consent.ContentHeaderCount, Is.EqualTo(3));
+            for (var i = 0; i < consent.ContentHeaders.Length; i++)
             {
-                Assert.That(reload.RpcMetadataServices[i], Is.EqualTo(consent.RpcMetadataServices[i]));
-                Assert.That(consent.RpcMetadataServices[i].Version, Is.EqualTo(services[i].Version));
-                Assert.That(
-                    reload.GetString(reload.RpcMetadataServices[i].NameOffset,
-                        reload.RpcMetadataServices[i].NameLength),
-                    Is.EqualTo(consent.GetString(consent.RpcMetadataServices[i].NameOffset,
-                        consent.RpcMetadataServices[i].NameLength)));
-                Assert.That(
-                    consent.GetString(consent.RpcMetadataServices[i].NameOffset,
-                        consent.RpcMetadataServices[i].NameLength),
-                    Is.EqualTo(services[i].ServiceName));
-                Assert.That(consent.RpcMetadataServices[i].CompressionType, Is.EqualTo(0x1));
-                Assert.That(consent.RpcMetadataServices[i].Timeout, Is.EqualTo(0x1));
+                Assert.That(reload.ContentHeaders[i], Is.EqualTo(consent.ContentHeaders[i]));
             }
 
-            for (var i = 0; i < consent.RpcMetadataTypeMappings.Length; i++)
+            var servicesHeader = consent.GetContentHeader<RpcMetadataService>(
+                consent.ContentHeaders[0].Offset,
+                consent.ContentHeaders[0].Count);
+            var reloadServiceHeader = reload.GetContentHeader<RpcMetadataService>(
+                reload.ContentHeaders[0].Offset,
+                reload.ContentHeaders[0].Count);
+            Assert.That(servicesHeader.Length, Is.EqualTo(reloadServiceHeader.Length));
+            for (var j = 0; j < servicesHeader.Length; j++)
             {
-                Assert.That(reload.RpcMetadataTypeMappings[i], Is.EqualTo(consent.RpcMetadataTypeMappings[i]));
-                Assert.That(typeMapping[i].Source, Is.EqualTo(consent.GetString(
-                    consent.RpcMetadataTypeMappings[i].SourceTypeOffset,
-                    consent.RpcMetadataTypeMappings[i].SourceTypeLength)));
-                Assert.That(typeMapping[i].Target, Is.EqualTo(consent.GetString(
-                    consent.RpcMetadataTypeMappings[i].TargetTypeOffset,
-                    consent.RpcMetadataTypeMappings[i].TargetTypeLength)));
-                Assert.That(consent.GetString(
-                        consent.RpcMetadataTypeMappings[i].SourceTypeOffset,
-                        consent.RpcMetadataTypeMappings[i].SourceTypeLength),
-                    Is.EqualTo(reload.GetString(
-                        reload.RpcMetadataTypeMappings[i].SourceTypeOffset,
-                        reload.RpcMetadataTypeMappings[i].SourceTypeLength)));
-                Assert.That(consent.GetString(
-                        consent.RpcMetadataTypeMappings[i].TargetTypeOffset,
-                        consent.RpcMetadataTypeMappings[i].TargetTypeLength),
-                    Is.EqualTo(reload.GetString(
-                        reload.RpcMetadataTypeMappings[i].TargetTypeOffset,
-                        reload.RpcMetadataTypeMappings[i].TargetTypeLength)));
+                Assert.That(servicesHeader[j], Is.EqualTo(reloadServiceHeader[j]));
+                Assert.That(servicesHeader[j].Version, Is.EqualTo(services[j].Version));
+                Assert.That(
+                    consent.GetString(servicesHeader[j].NameOffset, servicesHeader[j].NameLength),
+                    Is.EqualTo(reload.GetString(reloadServiceHeader[j].NameOffset,
+                        reloadServiceHeader[j].NameLength)));
+                Assert.That(
+                    consent.GetString(servicesHeader[j].NameOffset, servicesHeader[j].NameLength),
+                    Is.EqualTo(services[j].ServiceName));
+                Assert.That(servicesHeader[j].CompressionType, Is.EqualTo(0x1));
+                Assert.That(servicesHeader[j].Timeout, Is.EqualTo(0x1));
+            }
+
+            var typeMappingHeader = consent.GetContentHeader<RpcMetadataTypeMapping>(
+                consent.ContentHeaders[1].Offset,
+                consent.ContentHeaders[1].Count);
+            var reloadTypeMappingHeader = reload.GetContentHeader<RpcMetadataTypeMapping>(
+                reload.ContentHeaders[1].Offset,
+                reload.ContentHeaders[1].Count);
+            Assert.That(typeMappingHeader.Length, Is.EqualTo(reloadTypeMappingHeader.Length));
+            for (var i = 0; i < typeMappingHeader.Length; i++)
+            {
+                Assert.That(typeMappingHeader[i], Is.EqualTo(reloadTypeMappingHeader[i]));
+                Assert.That(
+                    consent.GetString(typeMappingHeader[i].SourceTypeOffset, typeMappingHeader[i].SourceTypeLength),
+                    Is.EqualTo(typeMapping[i].Source));
+                Assert.That(
+                    consent.GetString(typeMappingHeader[i].TargetTypeOffset, typeMappingHeader[i].TargetTypeLength),
+                    Is.EqualTo(typeMapping[i].Target));
+            }
+
+            var eventHandleHeader = consent.GetContentHeader<RpcMetadataEventHandle>(
+                consent.ContentHeaders[2].Offset,
+                consent.ContentHeaders[2].Count);
+            var reloadEventHandleHeader = reload.GetContentHeader<RpcMetadataEventHandle>(
+                reload.ContentHeaders[2].Offset,
+                reload.ContentHeaders[2].Count);
+            Assert.That(eventHandleHeader.Length, Is.EqualTo(reloadEventHandleHeader.Length));
+            for (var i = 0; i < eventHandleHeader.Length; i++)
+            {
+                Assert.That(eventHandleHeader[i], Is.EqualTo(reloadEventHandleHeader[i]));
+                Assert.That(
+                    consent.GetString(eventHandleHeader[i].EventNameOffset, eventHandleHeader[i].EventNameLength),
+                    Is.EqualTo(eventHandles[i].EventName));
+                Assert.That(consent.GetString(eventHandleHeader[i].TypeNameOffset, eventHandleHeader[i].TypeNameLength),
+                    Is.EqualTo(eventHandles[i].TypeName));
             }
         }
     }
