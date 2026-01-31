@@ -84,12 +84,12 @@ public class DataPackageTest
     {
         var services = new RpcMetadataServiceWrap[]
         {
-            new(0x1, "Service-A", 0x0101),
-            new(0x1, "Service-B", 0x0101),
-            new(0x1, "Service-C", 0x0101),
-            new(0x1, "Service-D", 0x0101),
-            new(0x2, "Service-A", 0x0101),
-            new(0x3, "Service-A", 0x0101),
+            new(0x1, "Service-A", "ABCDE"),
+            new(0x1, "Service-B", "ABCDE"),
+            new(0x1, "Service-C", "ABCDE"),
+            new(0x1, "Service-D", "ABCDE"),
+            new(0x2, "Service-A", "ABCDE"),
+            new(0x3, "Service-A", "ABCDE"),
         };
         var typeMapping = new RpcMetadataTypeMappingWrap[]
         {
@@ -133,8 +133,8 @@ public class DataPackageTest
                 Assert.That(
                     consent.GetString(servicesHeader[j].NameOffset, servicesHeader[j].NameLength),
                     Is.EqualTo(services[j].ServiceName));
-                Assert.That(servicesHeader[j].CompressionType, Is.EqualTo(0x1));
-                Assert.That(servicesHeader[j].Timeout, Is.EqualTo(0x1));
+                Assert.That(consent.GetString(servicesHeader[j].ImplementOffset, servicesHeader[j].ImplementLength),
+                    Is.EqualTo("ABCDE"));
             }
 
             var typeMappingHeader = consent.GetContentHeader<RpcMetadataTypeMapping>(

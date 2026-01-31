@@ -27,9 +27,12 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
      * -   Flag              byte           1             byte   内容数组标识
      * -   Offset            int            4             bytes  内容数组指向的内容数据偏移
      * -   Count             int            4             bytes  内容数据长度/数量
-     * Service Array         Service        8*count       bytes  服务数组
+     * Service Array         Service        20*count      bytes  服务数组
+     * -   Version           int            4             bytes  服务版本
      * -   Offset            int            4             bytes  服务数组服务名字符串相对String Pool 偏移
      * -   Length            int            4             bytes  服务数组服务名字符串字节长度
+     * -   ImplementOffset   int            4             bytes  服务实现偏移
+     * -   ImplementLength   int            4             bytes  服务实现长度
      * TypeMapping Array     TypeMapping    16*count      bytes  类型映射数组
      * -   Source Type       long           8             bytes  源类型（Offset, Length)组合， 字符串池
      * -   Target Type       long           8             bytes  目标类型（Offset, Length)组合， 字符串池
@@ -184,6 +187,7 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
         short contentHeaderCount = 2;
         var nameDataStr = content.Service
             .Select(p => p.ServiceName)
+            .Concat(content.Service.Select(p => p.ImplementName))
             .Concat(content.TypeMapping.Select(p => p.Source))
             .Concat(content.TypeMapping.Select(p => p.Target));
         var eventContentCount = 0;
@@ -234,7 +238,9 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
             var (offset, length) = dic[content.Service[i].ServiceName];
             *(int*)(serviceArray + i * sizeof(RpcMetadataService) + 4) = offset;
             *(int*)(serviceArray + i * sizeof(RpcMetadataService) + 8) = length;
-            *(long*)(serviceArray + i * sizeof(RpcMetadataService) + 12) = content.Service[i].TransportType;
+            (offset, length) = dic[content.Service[i].ImplementName];
+            *(int*)(serviceArray + i * sizeof(RpcMetadataService) + 12) = offset;
+            *(int*)(serviceArray + i * sizeof(RpcMetadataService) + 16) = length;
         }
 
         // 这是 typeMapping 的写入
@@ -294,7 +300,7 @@ public readonly struct RpcMetadataContent
     // ReSharper disable InconsistentNaming
     public const byte FLAG_SERVICE = 0x1;
     public const byte FLAG_TYPE_MAPPING = 0x2;
-    public const byte FLAG_EVENT_HANDLE = 0x4;
+    public const byte FLAG_EVENT_HANDLE = 0x3;
     // ReSharper restore InconsistentNaming
 
     /// <summary>
@@ -311,6 +317,10 @@ public readonly struct RpcMetadataContent
     [FieldOffset(5)] public readonly int Count;
 }
 
+/// <summary>
+/// 客户端->服务端 （询问具体服务/接口的实现）
+/// 服务端->客户端 （回复具体的实现/服务名）
+/// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1)]
 public readonly struct RpcMetadataService
 {
@@ -318,6 +328,11 @@ public readonly struct RpcMetadataService
     /// 服务版本
     /// </summary>
     [FieldOffset(0)] public readonly int Version;
+
+    /// <summary>
+    /// 服务名
+    /// </summary>
+    [FieldOffset(4)] public readonly long Name;
 
     /// <summary>
     /// 服务在字符串池中的相对offset
@@ -330,32 +345,29 @@ public readonly struct RpcMetadataService
     [FieldOffset(8)] public readonly int NameLength;
 
     /// <summary>
-    ///  传输类型， 8 bytes, 8 个小组合
+    ///  实现输出
     /// </summary>
-    [FieldOffset(12)] public readonly long TransportType;
+    [FieldOffset(12)] public readonly long Implement;
 
     /// <summary>
-    /// 压缩类型
+    /// 实现offset
     /// </summary>
-    [FieldOffset(12)] public readonly byte CompressionType;
+    [FieldOffset(12)] public readonly int ImplementOffset;
 
     /// <summary>
-    /// 超时时间 0 是永远等待不超时，后续是秒数
+    /// 实现长度
     /// </summary>
-    [FieldOffset(13)] public readonly byte Timeout;
-
-    /// <summary>
-    /// 是否开启调用结果/参数CRC校验
-    /// </summary>
-    [FieldOffset(14)] public readonly byte CRC32;
-
-    [FieldOffset(15)] public readonly byte Reserve2;
-    [FieldOffset(16)] public readonly byte Reserve3;
-    [FieldOffset(17)] public readonly byte Reserve4;
-    [FieldOffset(18)] public readonly byte Reserve5;
-    [FieldOffset(19)] public readonly byte Reserve6;
+    [FieldOffset(16)] public readonly int ImplementLength;
 }
 
+/// <summary>
+/// 特殊基础类型的特殊序列化映射
+/// 客户端->服务端 发送客户端存在的
+/// 服务端->客户端 约定共同支持的
+/// 如果出现缺少的，子类自行协商是否回落到通用序列化
+/// SourceType 可约定 特殊类型
+/// TargetType 可约定 特殊序列化方式
+/// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1)]
 public readonly struct RpcMetadataTypeMapping
 {
@@ -371,6 +383,10 @@ public readonly struct RpcMetadataTypeMapping
     [FieldOffset(12)] public readonly int TargetTypeLength;
 }
 
+/// <summary>
+/// 这里的ObjectGuid 通常可以全填0,如果是单例的可以直接确认
+/// 这里是 客户端->服务端的通知，服务端不存在这一项
+/// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 48)]
 public readonly unsafe struct RpcMetadataEventHandle
 {
@@ -411,7 +427,7 @@ public readonly unsafe struct RpcMetadataEventHandle
     [FieldOffset(44)] public readonly int EventNameLength;
 }
 
-public readonly record struct RpcMetadataServiceWrap(int Version, string ServiceName, long TransportType);
+public readonly record struct RpcMetadataServiceWrap(int Version, string ServiceName, string ImplementName);
 
 public readonly record struct RpcMetadataTypeMappingWrap(string Source, string Target);
 

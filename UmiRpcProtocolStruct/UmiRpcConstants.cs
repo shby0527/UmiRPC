@@ -29,6 +29,8 @@ public static class UmiRpcConstants
     public const int AUTHENTICATION_REQUIRED = unchecked((int)0x80_00_00_20);
     public const int AUTHENTICATION_FAILURE = unchecked((int)0x80_00_00_21);
 
+    public const int METADATA_CONSENT_FAILURE = unchecked((int)0x80_00_01_01);
+
     ///////////////////////////////////////////////////////
     // 下面开始 command 
 
