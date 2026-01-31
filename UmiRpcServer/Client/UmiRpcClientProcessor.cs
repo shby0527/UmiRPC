@@ -133,6 +133,13 @@ public abstract class UmiRpcClientProcessor : IDisposable
                         new SessionRefreshExecutor(ServiceFactory.SessionService)
                     }
                 }.ToImmutableDictionary()
+            },
+            {
+                ClientState.Executing,
+                new Dictionary<uint, IServerExecutor>
+                {
+                    { UmiRpcConstants.PING, pingExecutor },
+                }
             }
         };
         return dic.ToImmutableDictionary();

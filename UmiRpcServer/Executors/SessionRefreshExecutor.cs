@@ -26,7 +26,7 @@ public sealed class SessionRefreshExecutor(ISessionService service) : IServerExe
         }
 
         var result = await reader.ReadAtLeastAsync(basic.Length);
-        if (basic.Length <= 20)
+        if (basic.Length < 20)
         {
             // 异常包
             var position = result.Buffer.GetPosition(basic.Length);
