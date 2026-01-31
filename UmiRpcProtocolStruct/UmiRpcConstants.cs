@@ -24,6 +24,8 @@ public static class UmiRpcConstants
 
     public const int SESSION_CONFLICT = unchecked((int)0x80_00_00_10);
     public const int SESSION_ERROR = unchecked((int)0x80_00_00_11);
+    public const int SESSION_EXPIRED = unchecked((int)0x80_00_00_12);
+    public const int SESSION_NEW_SESSION_REQUIRED = unchecked((int)0x80_00_00_13);
 
 
     public const int AUTHENTICATION_REQUIRED = unchecked((int)0x80_00_00_20);

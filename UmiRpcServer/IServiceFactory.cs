@@ -7,4 +7,6 @@ public interface IServiceFactory
     IAuthenticationService AuthenticationService { get; }
 
     IMetadataService MetadataService { get; }
+
+    ISessionService SessionService { get; }
 }

@@ -16,6 +16,8 @@ public abstract class UmiRpcServerBase : IDisposable
 
     private readonly Lock _lock;
 
+    private readonly Timer _timer;
+
     protected UmiRpcServerBase(IPAddress address, int port, int backlog)
     {
         _socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
@@ -26,6 +28,22 @@ public abstract class UmiRpcServerBase : IDisposable
         _acceptArgs.Completed += AcceptArgsOnCompleted;
         _clientProcessors = [];
         _lock = new Lock();
+        _timer = new Timer(HealthWatchdog, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+    }
+
+    private void HealthWatchdog(object? state)
+    {
+        var node = _clientProcessors.First;
+        while (node is not null)
+        {
+            var current = node;
+            node = node.Next;
+            if (current.Value.Health is ClientHealthStatus.Unhealthy)
+            {
+                // Unhealthy， need remove and close
+                current.Value.Stop();
+            }
+        }
     }
 
     protected UmiRpcServerBase(IPAddress address, int port)
@@ -97,10 +115,10 @@ public abstract class UmiRpcServerBase : IDisposable
 
     public void Dispose()
     {
+        _timer.Dispose();
         _socket.Dispose();
         _acceptArgs.Completed -= AcceptArgsOnCompleted;
         _acceptArgs.Dispose();
         GC.SuppressFinalize(this);
     }
-    
 }

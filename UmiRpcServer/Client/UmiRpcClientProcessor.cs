@@ -21,9 +21,28 @@ public abstract class UmiRpcClientProcessor : IDisposable
 
     private readonly IServerExecutor _defaultExecutor = new DefaultExecutor();
 
+    private DateTimeOffset _latestDateTime = DateTimeOffset.UtcNow;
+
+    private DateTimeOffset _latestCallTime = DateTimeOffset.UtcNow;
+
     private ClientState _state = ClientState.Init;
 
     public ClientState State => _state;
+
+    public TimeSpan IdleTime => DateTimeOffset.UtcNow - _latestCallTime;
+
+    public ClientHealthStatus Health
+    {
+        get
+        {
+            var dateTime = DateTimeOffset.Now - _latestDateTime;
+            return dateTime <= TimeSpan.FromMinutes(5)
+                ? ClientHealthStatus.Healthy
+                : dateTime <= TimeSpan.FromMinutes(10)
+                    ? ClientHealthStatus.Questing
+                    : ClientHealthStatus.Unhealthy;
+        }
+    }
 
     public LinkedListNode<UmiRpcClientProcessor> Node { get; }
 
@@ -53,6 +72,17 @@ public abstract class UmiRpcClientProcessor : IDisposable
             }
         }
 
+        var pingExecutor = new PingExecutor(ServiceFactory.SessionService);
+        pingExecutor.Ping += (_, _) =>
+        {
+            // 空闲太久了
+            if (IdleTime > TimeSpan.FromHours(1))
+            {
+                Stop();
+            }
+
+            _latestDateTime = DateTimeOffset.UtcNow;
+        };
         var dic = new Dictionary<ClientState, IReadOnlyDictionary<uint, IServerExecutor>>
         {
             {
@@ -92,7 +122,17 @@ public abstract class UmiRpcClientProcessor : IDisposable
             {
                 ClientState.Idle,
                 new Dictionary<uint, IServerExecutor>(extensionsExecutors)
-                    .ToImmutableDictionary()
+                {
+                    { UmiRpcConstants.PING, pingExecutor },
+                    {
+                        UmiRpcConstants.SESSION_CLOSE,
+                        new SessionCloseExecutor(ServiceFactory.SessionService)
+                    },
+                    {
+                        UmiRpcConstants.SESSION_REFRESH,
+                        new SessionRefreshExecutor(ServiceFactory.SessionService)
+                    }
+                }.ToImmutableDictionary()
             }
         };
         return dic.ToImmutableDictionary();
@@ -120,13 +160,19 @@ public abstract class UmiRpcClientProcessor : IDisposable
         writer.Advance(args.BytesTransferred);
         _ = writer.FlushAsync()
             .AsTask()
-            .ContinueWith(_ =>
+            .ContinueWith(t =>
             {
+                if (t.IsCanceled || t.IsFaulted)
+                {
+                    writer.Complete(t.Exception);
+                    return;
+                }
+
                 if (!_socket.ReceiveAsync(_receiveArgs))
                 {
                     ReceivedArgsOnCompleted(this, _receiveArgs);
                 }
-            });
+            }).ConfigureAwait(false);
     }
 
     private async Task ProcessDataAsync()
