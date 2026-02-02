@@ -228,6 +228,40 @@ public class DataPackageTest
 
 
     [Test]
+    [TestCase(true)]
+    [TestCase(false)]
+    public void RpcCallResultTest(bool emptySpan)
+    {
+        using var rand = RandomNumberGenerator.Create();
+        var transactionId = Random.Shared.NextInt64();
+        Span<byte> buffer;
+        if (emptySpan)
+        {
+            buffer = Span<byte>.Empty;
+        }
+        else
+        {
+            buffer = new byte[1024];
+            rand.GetNonZeroBytes(buffer);
+        }
+
+        using var msg = RpcCallResult.CreateFromMessage(transactionId, RpcCallResultStatus.Completed, buffer);
+        using var re = RpcCallResult.CreateFromMemory(msg.Memory);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(msg.TransactionId, Is.EqualTo(transactionId));
+            Assert.That(msg.TransactionId, Is.EqualTo(re.TransactionId));
+            Assert.That(msg.ResultLength, Is.EqualTo(re.ResultLength));
+            Assert.That(msg.ResultLength, Is.EqualTo(buffer.Length));
+            Assert.That(msg.Status, Is.EqualTo(RpcCallResultStatus.Completed));
+            Assert.That(msg.Status, Is.EqualTo(re.Status));
+            Assert.That(msg.Result.SequenceEqual(re.Result), "msg and result not equals");
+            Assert.That(msg.Result.SequenceEqual(buffer), "result and buffer equals");
+        }
+    }
+
+
+    [Test]
     public void DynamicTest()
     {
         dynamic test = new ExpandoObject();

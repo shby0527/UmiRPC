@@ -19,7 +19,7 @@ public class AutoProxyTest
     {
         var type = AssemblyGenerator.GetOrGenerateType(typeof(ITest));
         IEnumerable<IInterceptor> interceptors = [new TestInterceptor()];
-        var instance = Activator.CreateInstance(type, new TestInvoker(), interceptors);
+        var instance = Activator.CreateInstance(type, new TestInvoker(), new RandomRaisePublish(), interceptors);
         if (instance is ITest test)
         {
             var parameter = 20f;
