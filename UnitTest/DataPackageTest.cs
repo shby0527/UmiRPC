@@ -1,5 +1,6 @@
 ﻿using System.Dynamic;
 using System.Security.Cryptography;
+using System.Text;
 using Umi.Rpc.Base;
 using Umi.Rpc.Protocol;
 
@@ -170,6 +171,58 @@ public class DataPackageTest
                     Is.EqualTo(eventHandles[i].EventName));
                 Assert.That(consent.GetString(eventHandleHeader[i].TypeNameOffset, eventHandleHeader[i].TypeNameLength),
                     Is.EqualTo(eventHandles[i].TypeName));
+            }
+        }
+    }
+
+
+    [Test]
+    public void RpcCallMessageTest()
+    {
+        RpcCallMessageWrap wrap = new("TestService",
+            ["string", "string"],
+            "TestMethod",
+            ["int", "string"],
+            [[0x00, 0x00, 0x00, 0x01], "你好阿"u8.ToArray()]);
+
+        using var msg = RpcCallMessage.CreateFromMessage(wrap);
+        using var re = RpcCallMessage.CreateFromMemory(msg.Memory);
+        using (Assert.EnterMultipleScope())
+        {
+            // 验证
+            Assert.That(msg.PackageLength, Is.EqualTo(re.PackageLength));
+            Assert.That(msg.StringPoolOffset, Is.EqualTo(re.StringPoolOffset));
+            Assert.That(msg.ObjectPoolOffset, Is.EqualTo(re.ObjectPoolOffset));
+            Assert.That(msg.ServiceGenericTypeCount, Is.EqualTo(re.ServiceGenericTypeCount));
+            Assert.That(msg.MethodGenericTypeCount, Is.EqualTo(re.MethodGenericTypeCount));
+            Assert.That(msg.ArgumentCount, Is.EqualTo(re.ArgumentCount));
+            Assert.That(msg.ServiceName, Is.EqualTo(re.ServiceName));
+            Assert.That(msg.GetString(msg.ServiceName), Is.EqualTo("TestService"));
+            Assert.That(msg.MethodName, Is.EqualTo(re.MethodName));
+            Assert.That(msg.GetString(msg.MethodName), Is.EqualTo("TestMethod"));
+            for (var i = 0; i < msg.ServiceGenericType.Length; i++)
+            {
+                var actual = msg.ServiceGenericType[i];
+                var expected = re.ServiceGenericType[i];
+                Assert.That(actual, Is.EqualTo(expected), $"loop {i}");
+                Assert.That(msg.GetString(actual), Is.EqualTo(re.GetString(expected)));
+                Assert.That(msg.GetString(actual), Is.EqualTo("string"));
+            }
+
+            for (var i = 0; i < msg.MethodGenericType.Length; i++)
+            {
+                var actual = msg.MethodGenericType[i];
+                var expected = re.MethodGenericType[i];
+                Assert.That(actual, Is.EqualTo(expected), $"loop {i}");
+                Assert.That(msg.GetString(actual), Is.EqualTo(re.GetString(expected)));
+            }
+
+            for (var i = 0; i < msg.Arguments.Length; i++)
+            {
+                var actual = msg.Arguments[i];
+                var expected = re.Arguments[i];
+                Assert.That(actual, Is.EqualTo(expected), $"loop {i}");
+                Assert.That(msg.GetObject(actual).SequenceEqual(re.GetObject(expected)), $"loop {i}");
             }
         }
     }

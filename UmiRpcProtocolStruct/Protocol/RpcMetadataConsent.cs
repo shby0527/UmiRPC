@@ -145,6 +145,11 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
                 throw new ArgumentOutOfRangeException(nameof(data));
             }
 
+            if (*(int*)(ptr + 8) > totalLength)
+            {
+                throw new OutOfMemoryException("String Pool Offset out of memory");
+            }
+
             var buffer = NativeMemory.Alloc((UIntPtr)totalLength);
             NativeMemory.Copy(ptr, buffer, (UIntPtr)totalLength);
             return new RpcMetadataConsent(buffer, totalLength);
@@ -168,8 +173,13 @@ public sealed unsafe class RpcMetadataConsent : RpcPackageBase
                 throw new ArgumentOutOfRangeException(nameof(data));
             }
 
+            if (*(int*)(ptr + 8) > totalLength)
+            {
+                throw new OutOfMemoryException("String Pool Offset out of memory");
+            }
+
             var buffer = NativeMemory.Alloc((UIntPtr)totalLength);
-            data.CopyTo(new Span<byte>(buffer, totalLength));
+            data.Slice(0, totalLength).CopyTo(new Span<byte>(buffer, totalLength));
             return new RpcMetadataConsent(buffer, totalLength);
         }
     }

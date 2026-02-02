@@ -100,7 +100,7 @@ public sealed unsafe class RpcBasic : RpcPackageBase
         if (data.Length < SIZE_OF_PACKAGE) throw new ArgumentOutOfRangeException(nameof(data));
         var buffer = NativeMemory.Alloc(SIZE_OF_PACKAGE);
         Span<byte> span = new(buffer, SIZE_OF_PACKAGE);
-        data.CopyTo(span);
+        data.Slice(0, SIZE_OF_PACKAGE).CopyTo(span);
         return new RpcBasic(buffer);
     }
 
@@ -109,7 +109,7 @@ public sealed unsafe class RpcBasic : RpcPackageBase
         if (data.Length < SIZE_OF_PACKAGE) throw new IndexOutOfRangeException(nameof(data));
         var buffer = NativeMemory.Alloc(SIZE_OF_PACKAGE);
         Span<byte> span = new(buffer, SIZE_OF_PACKAGE);
-        data.CopyTo(span);
+        data[..SIZE_OF_PACKAGE].CopyTo(span);
         return new RpcBasic(buffer);
     }
 

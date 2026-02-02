@@ -111,7 +111,7 @@ public sealed unsafe class RpcAuthenticationMessage : RpcPackageBase
                 throw new ArgumentOutOfRangeException(nameof(data));
 
             var buffer = NativeMemory.Alloc((UIntPtr)(9 + ul + pl + kl));
-            data.CopyTo(new Span<byte>(buffer, 9 + ul + pl + kl));
+            NativeMemory.Copy(pd, buffer, (UIntPtr)(9 + ul + pl + kl));
             return new RpcAuthenticationMessage(buffer, 9 + ul + pl + kl);
         }
     }
@@ -130,7 +130,7 @@ public sealed unsafe class RpcAuthenticationMessage : RpcPackageBase
                 throw new ArgumentOutOfRangeException(nameof(data));
 
             var buffer = NativeMemory.Alloc((UIntPtr)(9 + ul + pl + kl));
-            data.CopyTo(new Span<byte>(buffer, 9 + ul + pl + kl));
+            data.Slice(0, 9 + ul + pl + kl).CopyTo(new Span<byte>(buffer, 9 + ul + pl + kl));
             return new RpcAuthenticationMessage(buffer, 9 + ul + pl + kl);
         }
     }

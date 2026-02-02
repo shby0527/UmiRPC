@@ -47,7 +47,7 @@ public sealed unsafe class RpcCommonError : RpcPackageBase
             var l = *(int*)(pd + 4);
             if (l <= 0 || data.Length < l + 8) throw new ArgumentOutOfRangeException(nameof(data));
             var buffer = NativeMemory.Alloc((UIntPtr)(l + 8));
-            data.CopyTo(new Span<byte>(buffer, l + 8));
+            NativeMemory.Copy(pd, buffer, (UIntPtr)(l + 8));
             return new RpcCommonError(buffer, l + 8);
         }
     }
