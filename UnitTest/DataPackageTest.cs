@@ -1,6 +1,5 @@
 ﻿using System.Dynamic;
 using System.Security.Cryptography;
-using System.Text;
 using Umi.Rpc.Base;
 using Umi.Rpc.Protocol;
 
@@ -16,7 +15,7 @@ public class DataPackageTest
     [Test]
     public void TestBasicPackage()
     {
-        using RpcBasic package = RpcBasic.CreateFromMessage(0x4123);
+        using var package = RpcBasic.CreateFromMessage(0x4123);
         using var rnd = RandomNumberGenerator.Create();
         package.Length = 0;
         rnd.GetNonZeroBytes(package.Session);

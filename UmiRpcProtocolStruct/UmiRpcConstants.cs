@@ -95,9 +95,8 @@ public static class UmiRpcConstants
 
     #region 方法调用区
 
-    public const uint CALL = 0x03_00_00; // payload 待定
-    public const uint CALL_RESULT = 0x03_00_01; // payload 待定
-    public const uint CALL_EXCEPTION = 0x03_00_02; // payload 待定
+    public const uint CALL = 0x03_00_00; // payload RpcCallMessage
+    public const uint CALL_RESULT = 0x03_00_01; // payload RpcCallResult
     public const uint CALL_EVENT_RAISE = 0x03_00_03; // payload 待定
     public const uint CALL_METHOD_NOT_FOUND = 0x03_00_04; // payload 为 CommonError
 
