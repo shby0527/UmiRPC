@@ -260,6 +260,30 @@ public class DataPackageTest
         }
     }
 
+    [Test]
+    public void RpcExceptionMessageTest()
+    {
+        var transactionId = Random.Shared.NextInt64();
+        var exceptionId = Random.Shared.NextInt64();
+        using var msg = RpcCallResult.CreateFromExceptionMessage(transactionId, exceptionId, "NullReferenceException",
+            "Object is Null or Disposed 我也要试试");
+        using var re = RpcCallResult.CreateFromMemory(msg.Memory);
+        using (Assert.EnterMultipleScope())
+        {
+            var message = msg.GetExceptionMessage();
+            var reMessage = re.GetExceptionMessage();
+            Assert.That(message.ExceptionId, Is.EqualTo(reMessage.ExceptionId));
+            Assert.That(message.ExceptionId, Is.EqualTo(exceptionId));
+            Assert.That(message.StringPoolOffset, Is.EqualTo(reMessage.StringPoolOffset));
+            Assert.That(message.StringPoolOffset, Is.EqualTo(28));
+            Assert.That(message.ExceptionMessage, Is.EqualTo(reMessage.ExceptionMessage));
+            Assert.That(message.ExceptionName, Is.EqualTo(reMessage.ExceptionName));
+            Assert.That(msg.GetExceptionString(message.ExceptionName), Is.EqualTo("NullReferenceException"));
+            Assert.That(msg.GetExceptionString(message.ExceptionMessage),
+                Is.EqualTo("Object is Null or Disposed 我也要试试"));
+        }
+    }
+
 
     [Test]
     public void DynamicTest()

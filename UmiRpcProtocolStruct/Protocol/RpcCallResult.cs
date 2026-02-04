@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Umi.Rpc.Protocol;
 
@@ -61,6 +62,39 @@ public sealed unsafe class RpcCallResult : RpcPackageBase
 
     public ReadOnlySpan<byte> Result => new((byte*)Data + 12 + sizeof(RpcCallResultStatus), ResultLength);
 
+    public ref RpcExceptionMessage GetExceptionMessage()
+    {
+        ThrowIfDisposed();
+        if (Status != RpcCallResultStatus.Failure)
+        {
+            throw new InvalidOperationException("status not failure, no error message");
+        }
+
+        if (ResultLength < sizeof(RpcExceptionMessage))
+        {
+            throw new ArgumentOutOfRangeException(nameof(ResultLength), "length is less than Exception Message");
+        }
+
+        return ref *(RpcExceptionMessage*)((byte*)Data + 12 + sizeof(RpcCallResultStatus));
+    }
+
+    public string GetExceptionString(scoped in RpcOffsetLength ol)
+    {
+        ThrowIfDisposed();
+        if (Status != RpcCallResultStatus.Failure)
+        {
+            throw new InvalidOperationException("status not failure, no error message");
+        }
+
+        if (ResultLength < sizeof(RpcExceptionMessage) + ol.Offset + ol.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ResultLength), "length is less than Exception Message");
+        }
+
+        var stringPool = (byte*)Data + 12 + sizeof(RpcCallResultStatus) + sizeof(RpcExceptionMessage);
+        return Encoding.UTF8.GetString(stringPool + ol.Offset, ol.Length);
+    }
+
     public static RpcCallResult CreateFromMemory(scoped in ReadOnlySpan<byte> memory)
     {
         const int header = 12 + sizeof(RpcCallResultStatus);
@@ -110,7 +144,7 @@ public sealed unsafe class RpcCallResult : RpcPackageBase
 
     public static RpcCallResult CreateFromMessage(long transactionId,
         RpcCallResultStatus status,
-        scoped ReadOnlySpan<byte> result)
+        scoped in ReadOnlySpan<byte> result)
     {
         var totalLength = 12 + sizeof(RpcCallResultStatus) + result.Length;
         var buffer = (byte*)NativeMemory.Alloc((nuint)totalLength);
@@ -119,6 +153,28 @@ public sealed unsafe class RpcCallResult : RpcPackageBase
         *(int*)(buffer + 8 + sizeof(RpcCallResultStatus)) = result.Length;
         result.CopyTo(new Span<byte>(buffer + 12 + sizeof(RpcCallResultStatus), result.Length));
         return new RpcCallResult(buffer, totalLength);
+    }
+
+    public static RpcCallResult CreateFromExceptionMessage(long transactionId, long exceptionId,
+        string exName, string exMessage)
+    {
+        ReadOnlySpan<byte> nameData = Encoding.UTF8.GetBytes(exName);
+        ReadOnlySpan<byte> messageData = Encoding.UTF8.GetBytes(exMessage);
+        using var memory = MemoryPool<byte>.Shared.Rent(sizeof(RpcExceptionMessage)
+                                                        + nameData.Length
+                                                        + messageData.Length);
+        fixed (byte* ptr = memory.Memory.Span)
+        {
+            *(long*)ptr = exceptionId;
+            *(int*)(ptr + 8) = sizeof(RpcExceptionMessage);
+            (*(int*)(ptr + 12), *(int*)(ptr + 16)) = (0, nameData.Length);
+            (*(int*)(ptr + 20), *(int*)(ptr + 24)) = (nameData.Length, messageData.Length);
+        }
+
+        var strPool = memory.Memory.Span[sizeof(RpcExceptionMessage)..];
+        nameData.CopyTo(strPool);
+        messageData.CopyTo(strPool[nameData.Length..]);
+        return CreateFromMessage(transactionId, RpcCallResultStatus.Failure, memory.Memory.Span);
     }
 }
 
