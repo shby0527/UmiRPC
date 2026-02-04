@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using DynamicProxy;
+using Moq;
 using Umi.Proxy.Dynamic.Aspect;
 using Umi.Proxy.Dynamic.Dynamic;
 
@@ -9,17 +10,31 @@ namespace UnitTest;
 
 public class AutoProxyTest
 {
+    private IInvoker _invoker;
+    private IInterceptor _interceptor;
+
     [SetUp]
     public void Setup()
     {
+        Mock<IInvoker> mock = new(MockBehavior.Default);
+        mock.Setup(e => e.Process(It.IsAny<IMethodInvocation>()))
+            .Callback((IMethodInvocation invocation) => { invocation.ReturnValue = invocation.GetArgumentValue(0); });
+        _invoker = mock.Object;
+        Mock<IInterceptor> interceptor = new(MockBehavior.Default);
+        interceptor.Setup(e => e.BeforeInvoke(It.IsAny<IMethodInvocation>()))
+            .Callback((IMethodInvocation invocation) => { })
+            .Returns(true);
+        interceptor.Setup(e => e.AfterInvoke(It.IsAny<IMethodInvocation>()));
+        interceptor.Setup(e => e.ExceptionInvoke(It.IsAny<IMethodInvocation>(), It.IsAny<Exception>()));
+        _interceptor = interceptor.Object;
     }
 
     [Test]
     public void Test1()
     {
         var type = AssemblyGenerator.GetOrGenerateType(typeof(ITest));
-        IEnumerable<IInterceptor> interceptors = [new TestInterceptor()];
-        var instance = Activator.CreateInstance(type, new TestInvoker(), new RandomRaisePublish(), interceptors);
+        var instance =
+            Activator.CreateInstance(type, _invoker, new RandomRaisePublish(), (IInterceptor[])[_interceptor]);
         if (instance is ITest test)
         {
             var parameter = 20f;
@@ -150,9 +165,8 @@ public class AutoProxyTest
     public void ProxyObjectTest()
     {
         var type = AssemblyGenerator.GetOrGenerateType(typeof(ITest));
-        IEnumerable<IInterceptor> interceptors = [new TestInterceptor()];
         RandomRaisePublish publish = new();
-        var o = Activator.CreateInstance(type, new TestInvoker(), publish, interceptors);
+        var o = Activator.CreateInstance(type, _invoker, publish, (IInterceptor[])[_interceptor]);
         Assert.That(o, Is.Not.Null);
         Assert.That(o, Is.InstanceOf<ITest>());
         var test = o as ITest;
@@ -163,33 +177,6 @@ public class AutoProxyTest
         test!.TestEvent2 += (sender, args) => Debug.WriteLine(sender!.ToString());
         test!.TestEvent2 += (sender, args) => Debug.WriteLine(sender!.ToString());
         publish.Raise();
-    }
-}
-
-public class TestInterceptor : IInterceptor
-{
-    public bool BeforeInvoke(IMethodInvocation invocation)
-    {
-        Debug.WriteLine("before invoke" + invocation.TargetType.FullName);
-        return true;
-    }
-
-    public void AfterInvoke(IMethodInvocation invocation)
-    {
-        Debug.WriteLine("after invoke" + invocation.TargetType.FullName);
-    }
-
-    public void ExceptionInvoke(IMethodInvocation invocation, Exception exception)
-    {
-        Debug.WriteLine("exception" + invocation.TargetType.FullName + exception.Message);
-    }
-}
-
-public class TestInvoker : IInvoker
-{
-    public void Process(IMethodInvocation input)
-    {
-        input.ReturnValue = input.GetArgumentValue(0);
     }
 }
 
