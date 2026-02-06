@@ -36,6 +36,8 @@ public enum ClientState : byte
     /// 客户端关闭 逻辑存在，实际不存在
     /// </summary>
     Closed,
+    
+    UnChanged = byte.MaxValue,
 }
 
 public enum ClientHealthStatus : byte

@@ -73,6 +73,16 @@ public abstract class UmiRpcClientProcessor : IDisposable
         }
 
         var pingExecutor = new PingExecutor(ServiceFactory.SessionService);
+        var methodExec = new MethodExecExecutor(ServiceFactory.MethodExecService);
+        methodExec.Executed += (_, args) =>
+        {
+            var res = args.ResultCommand;
+            SendingPackage(UmiRpcConstants.CALL_RESULT, res)
+                .AsTask()
+                .ContinueWith(_ => res.Dispose());
+        };
+        var methodExecWrap = new ActionAdviseExecutor(methodExec);
+        methodExecWrap.BeforeExecute += (_, _) => _latestCallTime = DateTimeOffset.UtcNow;
         pingExecutor.Ping += (_, _) =>
         {
             // 空闲太久了
@@ -131,7 +141,8 @@ public abstract class UmiRpcClientProcessor : IDisposable
                     {
                         UmiRpcConstants.SESSION_REFRESH,
                         new SessionRefreshExecutor(ServiceFactory.SessionService)
-                    }
+                    },
+                    { UmiRpcConstants.CALL, methodExecWrap }
                 }.ToImmutableDictionary()
             },
             {
@@ -225,7 +236,7 @@ public abstract class UmiRpcClientProcessor : IDisposable
                     if (executor.TryGetValue(basic.Command, out var serverExecutor))
                     {
                         var rp = await serverExecutor.ExecuteCommandAsync(basic, reader);
-                        _state = rp.NextState;
+                        _state = rp.NextState == ClientState.UnChanged ? _state : rp.NextState;
                         using var pack = rp.Package;
                         await SendingPackage(rp.ResultCommand, pack);
                         if (rp.CloseConnection)

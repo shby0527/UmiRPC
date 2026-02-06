@@ -48,7 +48,7 @@ public class PingExecutor(ISessionService service) : IServerExecutor
         {
             ResultCommand = UmiRpcConstants.PONG,
             CloseConnection = false,
-            NextState = ClientState.Idle
+            NextState = ClientState.UnChanged
         };
     }
 }

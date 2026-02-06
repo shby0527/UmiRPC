@@ -9,4 +9,6 @@ public interface IServiceFactory
     IMetadataService MetadataService { get; }
 
     ISessionService SessionService { get; }
+
+    IMethodExecService MethodExecService { get; }
 }
