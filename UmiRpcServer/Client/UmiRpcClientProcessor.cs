@@ -35,7 +35,7 @@ public abstract class UmiRpcClientProcessor : IDisposable
     {
         get
         {
-            var dateTime = DateTimeOffset.Now - _latestDateTime;
+            var dateTime = DateTimeOffset.UtcNow - _latestDateTime;
             return dateTime <= TimeSpan.FromMinutes(5)
                 ? ClientHealthStatus.Healthy
                 : dateTime <= TimeSpan.FromMinutes(10)
