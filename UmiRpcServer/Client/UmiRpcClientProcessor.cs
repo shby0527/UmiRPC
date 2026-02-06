@@ -83,6 +83,12 @@ public abstract class UmiRpcClientProcessor : IDisposable
         };
         var methodExecWrap = new ActionAdviseExecutor(methodExec);
         methodExecWrap.BeforeExecute += (_, _) => _latestCallTime = DateTimeOffset.UtcNow;
+        extensionsExecutors = extensionsExecutors.ToImmutableDictionary(p => p.Key, IServerExecutor (p) =>
+        {
+            var wrap = new ActionAdviseExecutor(p.Value);
+            wrap.BeforeExecute += (_, _) => _latestCallTime = DateTimeOffset.UtcNow;
+            return wrap;
+        });
         pingExecutor.Ping += (_, _) =>
         {
             // 空闲太久了
