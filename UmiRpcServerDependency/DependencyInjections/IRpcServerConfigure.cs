@@ -18,6 +18,9 @@ public interface IRpcServerConfigure
 
     IRpcServerConfigure AddTypeMappings(IDictionary<string, Type> types);
 
+    IRpcServerConfigure AddEvent(Guid guid, string name);
+
+    IRpcServerConfigure AddEvents(IDictionary<string, Guid> events);
 
     IRpcServerMetadata Build();
 }

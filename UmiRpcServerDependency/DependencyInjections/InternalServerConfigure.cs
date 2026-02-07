@@ -40,6 +40,16 @@ internal sealed class InternalServerConfigure(IServiceCollection collection) : I
         return this;
     }
 
+    public IRpcServerConfigure AddEvent(Guid guid, string name)
+    {
+        return this;
+    }
+
+    public IRpcServerConfigure AddEvents(IDictionary<string, Guid> events)
+    {
+        return this;
+    }
+
     public IRpcServerMetadata Build()
     {
         throw new NotImplementedException();
