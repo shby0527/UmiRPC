@@ -8,8 +8,10 @@ public static class ServerStartupExtensions
 {
     public static IRpcServerConfigure AddRpcServer(this IServiceCollection collection)
     {
-        collection.AddSingleton<ServerBackgroundWorker>();
+        collection.AddHostedService<ServerBackgroundWorker>();
         collection.AddSingleton<DependencyRpcServer>();
-        return new InternalServerConfigure(collection);
+        var configure = new InternalServerConfigure(collection);
+        collection.AddSingleton<IRpcServerMetadata>(_ => configure.Build());
+        return configure;
     }
 }
