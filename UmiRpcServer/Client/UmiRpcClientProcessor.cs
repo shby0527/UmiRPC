@@ -301,7 +301,7 @@ public abstract class UmiRpcClientProcessor : IDisposable
         Close?.Invoke(this, new UmiRpcClientCloseEventArgs(Node));
     }
 
-    public void Dispose()
+    public virtual void Dispose()
     {
         if (_socket.Connected)
         {
