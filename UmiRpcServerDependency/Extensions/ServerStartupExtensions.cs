@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Umi.Rpc.Server.DependencyInjections.Injections;
+using Umi.Rpc.Server.DependencyInjections.Injections.Implements;
 using UmiRpcServerDependency.Server;
 
 namespace Umi.Rpc.Server.DependencyInjections.Extensions;

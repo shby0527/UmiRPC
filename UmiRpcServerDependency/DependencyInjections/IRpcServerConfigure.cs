@@ -4,11 +4,11 @@ namespace Umi.Rpc.Server.DependencyInjections.Injections;
 
 public interface IRpcServerConfigure
 {
-    IRpcServerConfigure AddService<TService>(string name) where TService : class;
+    IRpcServerConfigure AddService<TService>(string name, int version) where TService : class;
 
-    IRpcServerConfigure AddService(Type service, string name);
+    IRpcServerConfigure AddService(Type service, string name, int version);
 
-    IRpcServerConfigure AddServices(IDictionary<string, Type> types);
+    IRpcServerConfigure AddServices(IDictionary<string, Type> types, int version);
 
     IRpcServerConfigure RegisterServices(Assembly assembly);
 
@@ -16,11 +16,11 @@ public interface IRpcServerConfigure
 
     IRpcServerConfigure AddTypeMappings(Type type, string mapping);
 
-    IRpcServerConfigure AddTypeMappings(IDictionary<string, Type> types);
+    IRpcServerConfigure AddTypeMappings(IDictionary<Type, string> types);
 
     IRpcServerConfigure AddEvent(Guid guid, string name);
 
-    IRpcServerConfigure AddEvents(IDictionary<string, Guid> events);
+    IRpcServerConfigure AddEvents(IDictionary<Guid, string> events);
 
     IRpcServerMetadata Build();
 }
